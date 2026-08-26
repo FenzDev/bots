@@ -1,10 +1,34 @@
 import express from "express";
+import { NODE_ENV, PORT } from "./config/env";
+import logger from "./lib/logger";
+import "./utils/error";
 
-const app = express();
-const port = Number(process.env.PORT ?? 3000);
+function runWebhookServer() {
+  const app = express();
+  
+  app.use()
 
-app.listen(port, (err) => {
-  if (err) throw err;
+  app.listen(PORT, (err) => {
+    if (err) throw err;
+  
+    logger.info('Server is running at ');
+  });
+}
 
-  console.log(`Server is running on http://localhost:${port}, this will be used only when doing Webhook`);
-});
+function runLongPooling() {
+   
+}
+
+logger.info(`----------------------------`)
+logger.info(`  Fenz' Study Bot Helpers!  `)
+logger.info(`----------------------------`)
+logger.info(`> ${NODE_ENV.toUpperCase()}`);
+if (NODE_ENV === 'production'){
+  runWebhookServer();
+} else if (NODE_ENV === 'development') {
+  runLongPooling();
+} else if (NODE_ENV === 'test') {
+  // tests not implemented
+  process.exit(0);
+}
+
