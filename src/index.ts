@@ -1,10 +1,10 @@
-import Express from "express"
+import express from "express";
 
-const app = Express();
-const port = process.env.PORT ?? 3000;
+const app = express();
+const port = Number(process.env.PORT ?? 3000);
 
-app.listen(3000, (err)=> {
+app.listen(port, (err) => {
   if (err) throw err;
 
-  console.log(`Server is running on http://localhost:${port}`)
+  console.log(`Server is running on http://localhost:${port}, this will be used only when doing Webhook`);
 });
