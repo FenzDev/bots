@@ -5,22 +5,20 @@ import "./utils/error";
 
 function runWebhookServer() {
   const app = express();
-  
-  app.use()
+  app.use();
 
   app.listen(PORT, (err) => {
     if (err) throw err;
-  
     logger.info('Server is running at ');
   });
 }
 
 function runLongPooling() {
-   
+  
 }
 
 logger.info(`----------------------------`)
-logger.info(`  Fenz' Study Bot Helpers!  `)
+logger.info(`  Fenz Study Helper Bots !  `)
 logger.info(`----------------------------`)
 logger.info(`> ${NODE_ENV.toUpperCase()}`);
 if (NODE_ENV === 'production'){
