@@ -10,10 +10,12 @@ export function defineAction<TId, TArgs>({doAction,undoAction,display}: {
   display?: {title:string, description?:(args:TArgs)=>string},
 }) {
   async function _doAction(args: TArgs): Promise<TId | null> {
+    // TODO: Track if it has display
     return await doAction(args);
   }
-
+  
   async function _undoAction(id: TId): Promise<boolean> {
+    // TODO: Untrack if it had display
     return await undoAction(id);
   }
 

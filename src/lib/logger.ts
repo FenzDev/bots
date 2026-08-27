@@ -1,7 +1,7 @@
 import pino from "pino";
 
 export default pino({
-  level: process.env.LOG_LEVEL ?? "info",
+  level: process.env.NODE_ENV==='development'? 'debug': "info",
 
   transport:
     process.env.NODE_ENV !== "production"
