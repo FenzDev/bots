@@ -17,7 +17,7 @@ const envSchema = z.object({
   TELEGRAM_SUPERADMIN_ID: z.coerce.number(),
   TELEGRAM_SUPERADMIN_USERNAME: z.string(),
   MONGODB_URI: z.string(),
-  // TELEGRAM_ARCHIVE_TARGET: telegramTargetSchema,
+  DB_MAX_HISTORY_MESSAGES: z.coerce.number(),
 });
 
 const result = envSchema.safeParse(process.env);
@@ -40,6 +40,7 @@ export const {
   TELEGRAM_TIMETABLEBOT_TOKEN,
   TELEGRAM_SUPERADMIN_ID,
   TELEGRAM_SUPERADMIN_USERNAME,
+  DB_MAX_HISTORY_MESSAGES,
 
   MONGODB_URI,
 } = env;

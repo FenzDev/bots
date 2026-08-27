@@ -22,15 +22,18 @@ const botHandlers = [
   ["timetablebot", timetableBot],
 ] as const;
 
-export async function handleBots() {
+export async function handleBots(systemHandle:(bot:Bot)=>Promise<void>|void) {
   for (const [name,bot] of botHandlers)
   {
     try {
+      await systemHandle(bot);
+
       const handlersDirectory = fileURLToPath(
         new URL(`../../handlers/${name}/`, import.meta.url),
       );
 
       const num = await loadHandlers(bot, handlersDirectory);
+
       logger.info(`${num}/${num} ${name} handlers were loaded.`);
     } catch (err) {
       logger.error({ err }, `${name} handlers were not loaded.`);
