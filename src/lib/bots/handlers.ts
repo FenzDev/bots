@@ -28,7 +28,7 @@ export async function loadHandlers(
 
     try {
       if (entry.isDirectory()) {
-        await loadHandlers(bot, fullPath);
+        num += await loadHandlers(bot, fullPath);
         continue;
       }
 
