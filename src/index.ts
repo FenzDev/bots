@@ -5,6 +5,7 @@ import "./utils/error";
 import { chillBot, guardBot, handleBots, timetableBot } from "./lib/bots";
 import { Bot } from "grammy";
 import { connectDatabase } from "./lib/mongodb";
+import { handleSchedules } from "./lib/cron-schedules";
 
 async function runServer() {
   const app = express();
@@ -54,9 +55,9 @@ logger.info(`----------------------------`);
 logger.info(`> ${NODE_ENV.toUpperCase()}`);
 
 await connectDatabase();
- 
 await handleBots(handleConfig);
-
+await handleSchedules();
+ 
 if (NODE_ENV === "production") {
   await runServer();
 } else if (NODE_ENV === "development") {
