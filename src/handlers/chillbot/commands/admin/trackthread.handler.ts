@@ -16,10 +16,9 @@ export default async (bot: Bot) => {
         await ctx.reply("Usage: /trackthread <chatId> <threadId>");
         return next();
       }
-
       const { added } = await trackedScopes.add({
         chatId,
-        threadId,
+        threadId: threadId !== 0? threadId: null,
       });
 
       if (added)
