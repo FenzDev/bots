@@ -1,4 +1,4 @@
-import z, { ZodType } from "zod";
+import z, { unknown, ZodType } from "zod";
 import { $ZodTypeInternals } from "zod/v4/core";
 import {
   AIApplication,
@@ -12,9 +12,15 @@ import { getMoreMessagesTool } from "./tools";
 import { Message, messages } from "../../../../repositories/message.repository";
 import { User, users } from "../../../../repositories/user.repository";
 import logger from "../../../../lib/logger";
+import { TELEGRAM_SUPERADMIN_ID } from "../../../../config/env";
 
 const chatbotAIResultSchema = z.object({
-  text: z.string(),
+  replies: z.array(z.object({
+    replyTo: z.number('messageId'),
+    text: z.string(),
+    reason: z.string(),
+  })),
+
 });
 
 export type ChatbotAIResult = z.infer<typeof chatbotAIResultSchema>;
@@ -26,20 +32,22 @@ export type ChatbotAIInput = {
   mentions: Message[];
 };
 
+type ChatbotAIToolResult = {call:AIToolCall, result:JSONValue};
+
 export type ChatbotAIContext = {
   /**
    * the messages that ai replied to
-   * from mentions to make chat feel alive
+   * from early mentions to make chat feel alive
    */
   oldRepliedMessages: {
     userMention: Message;
     aiReply: Message;
     breifContext: string;
   }[];
-  botId: number;
   existingUsers: User[];
   conversation: Message[];
-};
+  toolResults: ChatbotAIToolResult[];
+} & ChatbotAIInput;
 
 export class ChatbotAIApp implements AIApplication<
   ChatbotAIInput,
@@ -77,7 +85,10 @@ export class ChatbotAIApp implements AIApplication<
     );
 
     const senderIds = [
-      ...new Set(conversation.map((message) => message.senderId)),
+      ...new Set([
+        ...conversation.map((msg) => msg.senderId),
+        ...input.mentions.map((msg) => msg.senderId),
+      ]),
     ];
 
     const existingUsers = await Promise.all(
@@ -85,10 +96,14 @@ export class ChatbotAIApp implements AIApplication<
     );
 
     return {
+      chatId: input.chatId,
+      threadId: input.threadId,
       oldRepliedMessages: [], // TODO: add old replied messages
       conversation,
       existingUsers: existingUsers.filter((user) => user != null),
+      mentions: input.mentions,
       botId: input.botId,
+      toolResults: [],
     };
   }
 
@@ -97,8 +112,7 @@ export class ChatbotAIApp implements AIApplication<
     call: AIToolCall,
     result: JSONValue,
   ): ChatbotAIContext {
-    logger.debug("tool wants to be added");
-    return { ...context };
+    return {...context, toolResults: [...context.toolResults, {call,result:result}]}
   }
 
   serialize({
@@ -106,7 +120,7 @@ export class ChatbotAIApp implements AIApplication<
     instruction,
   }: AIRawPayload<ChatbotAIContext>): AIPrompt {
     const validUsers = context.existingUsers.filter(
-      (user): user is NonNullable<typeof user> => user != null,
+      (user) => user != null && user.telegramId !== context.botId,
     );
 
     const userLabels = new Map(
@@ -128,31 +142,46 @@ export class ChatbotAIApp implements AIApplication<
           label,
           {
             ...user,
+            _id: undefined,
+            isBotOwner:
+              user.telegramId === TELEGRAM_SUPERADMIN_ID ? true : undefined,
+            insertedAt: undefined,
           },
         ];
       }),
     );
-    
+
     const resultFormat = this.resultSchema
       ? JSON.stringify(this.resultSchema.toJSONSchema(), null, 2)
       : undefined;
 
-    const conversation = context.conversation.map((message) => ({
-      ...message,
-      sender:
-        message.senderId === context.botId
-          ? `Assistant (${this.name})`
-          : (userLabels.get(message.senderId) ?? "Unknown user"),
-      _id: undefined,
-      chatId: undefined,
-      threadId: undefined,
-      senderId: undefined,
-      storedAt: undefined,
-    }));
+    const conversation = context.conversation
+      .map((message) => ({
+        ...message,
+        sender:
+          message.senderId === context.botId
+            ? `Assistant (${this.name})`
+            : (userLabels.get(message.senderId) ?? "Unknown user"),
+        _id: undefined,
+        chatId: undefined,
+        threadId: undefined,
+        senderId: undefined,
+        storedAt: undefined,
+      }))
+      .sort((a, b) => a.messageId - b.messageId);
 
     const promptData = {
       users: usersObject,
       conversation,
+      mentions: context.mentions.map((mention) => ({
+        ...mention,
+        _id: undefined,
+        chatId: undefined,
+        threadId: undefined,
+        storedAt: undefined,
+        senderId: undefined,
+      })),
+      toolResult: context.toolResults.length>0? context.toolResults: undefined,
     };
 
     return [

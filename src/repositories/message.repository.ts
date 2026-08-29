@@ -101,15 +101,6 @@ async function enforceHistoryLimit(scope: MessageScope) {
     },
   });
 
-  if (result.deletedCount > 0) {
-    logger.debug(
-      {
-        ...scope,
-        deletedCount: result.deletedCount,
-      },
-      "Old message history removed",
-    );
-  }
 }
 
 async function add(message: Message) {

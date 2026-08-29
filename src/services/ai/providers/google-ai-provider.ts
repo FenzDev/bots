@@ -49,8 +49,6 @@ export class GemmaProvider implements AIProvider {
     state?: AIProviderState,
   ): Promise<AIResponse> {
 
-    logger.debug({prompt,tools,state},'Prompts and tools received by provider:')
-
     const gemmaState = state as GemmaState | undefined;
 
     const interaction = await this.ai.interactions.create({
@@ -83,7 +81,6 @@ export class GemmaProvider implements AIProvider {
 
     const parts: AIResponsePart[] = [];
     for (const step of interaction.steps ?? []) {
-      logger.debug(step);
       if (step.type === "function_call") {
         parts.push({
           type: "tool_call",

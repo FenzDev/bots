@@ -93,7 +93,7 @@ export async function runAIApp<TInput, TContext, TResult>(
           part.call.args,
         );
 
-        const toolResult = await tool.execute(args);
+        const toolResult = await tool.execute(context,args);
 
         context = await app.addToolResult(
           context,

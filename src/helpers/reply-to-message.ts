@@ -7,6 +7,7 @@ export async function replyToMessage(
 ) {
   return await ctx.api.sendMessage(ctx.chat?.id!, text, {
     reply_parameters: { message_id: ctx.message?.message_id },
+    message_thread_id: ctx.message?.message_thread_id,
     ...options,
   });
 }
