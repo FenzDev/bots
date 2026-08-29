@@ -9,6 +9,7 @@ export type User = {
   insertedAt: Date;
   firstName: string;
   lastName?: string;
+  isBot?: boolean;
 };
 
 const collection: Collection<User> = db.collection<User>("users");
@@ -21,6 +22,7 @@ async function upsertUser(user: User) {
         username: user.username,
         firstName: user.firstName,
         lastName: user.lastName,
+        isBot: user.isBot,
       },
 
       // Only set this when creating the user
@@ -39,6 +41,12 @@ async function upsertUser(user: User) {
   }
 }
 
+async function findUserById(telegramId : number) {
+  return collection
+    .findOne({ telegramId });
+}
+
 export const users = {
   upsertUser,
+  findUserById,
 };

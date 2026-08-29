@@ -57,7 +57,7 @@ logger.info(`> ${NODE_ENV.toUpperCase()}`);
 await connectDatabase();
 await handleBots(handleConfig);
 await handleSchedules();
- 
+
 if (NODE_ENV === "production") {
   await runServer();
 } else if (NODE_ENV === "development") {

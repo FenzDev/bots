@@ -1,15 +1,19 @@
 import { Bot } from "grammy";
-import type { Message } from "grammy/types";
+import type { Message, User } from "grammy/types";
 
 import {
   type Scope,
   trackedScopes,
 } from "../../repositories/tracked_scope.repository.js";
-import { messages, type Message as DbMessage } from "../../repositories/message.repository.js";
+import {
+  messages,
+  type Message as DbMessage,
+} from "../../repositories/message.repository.js";
 import logger from "../../lib/logger.js";
-import { dbMessageFromContext } from "../../helpers/db-msg-from-context.js";
+import { users } from "../../repositories/user.repository.js";
+import { dbMessageFromTelegramMessage } from "../../helpers/db-msg-from-telegram.js";
 
-async function trackMessage(message: DbMessage): Promise<boolean> {
+async function trackMessage(message: DbMessage, from: User): Promise<boolean> {
   const scope: Scope = {
     chatId: message.chatId,
     threadId: message.threadId,
@@ -19,38 +23,17 @@ async function trackMessage(message: DbMessage): Promise<boolean> {
     return false;
   }
 
+  await users.upsertUser({
+    telegramId: from.id,
+    firstName: from.first_name,
+    lastName: from.last_name,
+    username: from.username,
+    isBot: from.is_bot || undefined,
+    insertedAt: new Date(),
+  });
+
   await messages.add(message);
   return true;
-}
-
-function scopeFromTelegramMessage(message: Message): Scope {
-  return {
-    chatId: message.chat.id,
-    threadId: message.is_topic_message
-      ? message.message_thread_id ?? null
-      : null,
-  };
-}
-
-function dbMessageFromTelegramMessage(
-  message: Message,
-  senderId: number,
-): DbMessage | null {
-  const scope = scopeFromTelegramMessage(message);
-
-  if ("text" in message) {
-    return {
-      ...scope,
-      messageId: message.message_id,
-      senderId,
-      type: "text",
-      text: message.text ?? '',
-      sentAt: new Date(message.date * 1000),
-      storedAt: new Date(),
-    };
-  }
-
-  return null;
 }
 
 export default async (bot: Bot) => {
@@ -65,11 +48,12 @@ export default async (bot: Bot) => {
 
     const dbMessage = dbMessageFromTelegramMessage(
       telegramMessage,
-      bot.botInfo.id,
     );
 
     if (dbMessage) {
-      await trackMessage(dbMessage);
+      const sender = (res.result as unknown as Message.TextMessage).from!;
+      logger.debug({sender},`Upsert bot:`)
+      await trackMessage(dbMessage, sender);
     }
 
     return res;
@@ -80,10 +64,11 @@ export default async (bot: Bot) => {
       return next();
     }
 
-    const dbMessage = dbMessageFromContext(ctx);
+    const dbMessage = dbMessageFromTelegramMessage(ctx.msg);
 
     if (dbMessage) {
-      await trackMessage(dbMessage);
+      logger.debug({sender:ctx.from},`Upsert user:`);
+      await trackMessage(dbMessage, ctx.from);
     }
 
     return next();

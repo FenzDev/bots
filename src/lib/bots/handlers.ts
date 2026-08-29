@@ -18,17 +18,21 @@ const handlerModuleSchema = z.object({
 export async function loadHandlers(
   bot: Bot,
   handlersDirectory: string,
-): Promise<number> {
+) {
   const entries = await readdir(handlersDirectory, {
     withFileTypes: true,
   });
   let num = 0;
+  let maxNum = 0;
   for (const entry of entries) {
     const fullPath = join(handlersDirectory, entry.name);
 
     try {
       if (entry.isDirectory()) {
-        num += await loadHandlers(bot, fullPath);
+        const {num:addedNum, maxNum:addedMaxNum } = await loadHandlers(bot, fullPath);
+        num += addedNum;
+        maxNum += addedMaxNum;
+        
         continue;
       }
 
@@ -56,6 +60,7 @@ export async function loadHandlers(
     } catch (err) {
       logger.error({ err }, `${entry.name} was not loaded`);
     }
+    maxNum++;
   }
-  return num;
+  return {num, maxNum};
 }

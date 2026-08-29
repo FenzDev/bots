@@ -32,9 +32,9 @@ export async function handleBots(systemHandle:(bot:Bot)=>Promise<void>|void) {
         new URL(`../../handlers/${name}/`, import.meta.url),
       );
 
-      const num = await loadHandlers(bot, handlersDirectory);
+      const {num,maxNum} = await loadHandlers(bot, handlersDirectory);
 
-      logger.info(`${num}/${num} ${name} handlers were loaded.`);
+      logger.info(`${num}/${maxNum} ${name} handlers were loaded.`);
     } catch (err) {
       logger.error({ err }, `${name} handlers were not loaded.`);
     }

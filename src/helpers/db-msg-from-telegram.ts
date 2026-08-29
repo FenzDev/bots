@@ -2,7 +2,7 @@ import type { Context } from "grammy";
 
 import type {
   FileMessage,
-  Message,
+  Message as DbMessage,
   MessageScope,
   PhotoMessage,
   PollMessage,
@@ -10,24 +10,27 @@ import type {
   VoiceMessage,
 } from "../repositories/message.repository";
 
-export function dbMessageFromContext(ctx: Context): Message | null {
-  const message = ctx.message;
+import type { Message,User } from "grammy/types";
 
-  if (!message || !ctx.from) {
+
+export function dbMessageFromTelegramMessage(
+  message: Message,
+): DbMessage | null {
+  if (!message || !message.from) {
     return null;
   }
 
   const scope: MessageScope = {
     chatId: message.chat.id,
     threadId: message.is_topic_message
-      ? message.message_thread_id ?? null
+      ? (message.message_thread_id ?? null)
       : null,
   };
 
   const base = {
     ...scope,
     messageId: message.message_id,
-    senderId: ctx.from.id,
+    senderId: message.from.id,
     sentAt: new Date(message.date * 1000),
     storedAt: new Date(),
   };
@@ -36,7 +39,7 @@ export function dbMessageFromContext(ctx: Context): Message | null {
     const result: TextMessage = {
       ...base,
       type: "text",
-      text: message.text ?? '',
+      text: message.text ?? "",
     };
 
     return result;
@@ -46,12 +49,13 @@ export function dbMessageFromContext(ctx: Context): Message | null {
     const result: PollMessage = {
       ...base,
       type: "poll",
-      pollId: message.poll?.id ?? '',
-      question: message.poll?.question ?? '',
-      options: message.poll?.options.map((option) => ({
-        text: option.text,
-        voterCount: option.voter_count,
-      })) ?? [],
+      pollId: message.poll?.id ?? "",
+      question: message.poll?.question ?? "",
+      options:
+        message.poll?.options.map((option) => ({
+          text: option.text,
+          voterCount: option.voter_count,
+        })) ?? [],
     };
 
     return result;
@@ -95,7 +99,7 @@ export function dbMessageFromContext(ctx: Context): Message | null {
   if ("voice" in message) {
     const voice = message.voice;
 
-    if (!voice){
+    if (!voice) {
       return null;
     }
 
