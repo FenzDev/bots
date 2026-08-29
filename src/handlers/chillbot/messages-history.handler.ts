@@ -52,7 +52,7 @@ export default async (bot: Bot) => {
 
     if (dbMessage) {
       const sender = (res.result as unknown as Message.TextMessage).from!;
-      logger.debug({sender},`Upsert bot:`)
+      // logger.debug({sender},`Upsert bot:`)
       await trackMessage(dbMessage, sender);
     }
 
@@ -67,7 +67,7 @@ export default async (bot: Bot) => {
     const dbMessage = dbMessageFromTelegramMessage(ctx.msg);
 
     if (dbMessage) {
-      logger.debug({sender:ctx.from},`Upsert user:`);
+      // logger.debug({sender:ctx.from},`Upsert user:`);
       await trackMessage(dbMessage, ctx.from);
     }
 

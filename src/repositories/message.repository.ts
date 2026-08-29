@@ -12,6 +12,7 @@ export type MessageScope = {
 type BaseMessage = MessageScope & {
   messageId: number;
   senderId: number;
+  replyTargetId?: number;
   sentAt: Date;
   storedAt: Date;
 };
