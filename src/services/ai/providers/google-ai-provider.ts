@@ -58,7 +58,7 @@ export class GemmaProvider implements AIProvider {
 
       generation_config: {
         thinking_summaries: "auto",
-        thinking_level: "high",
+        thinking_level: prompt.useHighThinking? "high": "minimal",
       },
 
       input: this.getInput(prompt),
@@ -111,6 +111,7 @@ export class GemmaProvider implements AIProvider {
 
   private getSystemInstruction(prompt: AIPrompt): string | undefined {
     const system = prompt
+      .parts
       .filter((message) => message.role === "system")
       .map((message) => message.content)
       .join("\n\n");
@@ -120,6 +121,7 @@ export class GemmaProvider implements AIProvider {
 
   private getInput(prompt: AIPrompt): string {
     return prompt
+      .parts
       .filter((message) => message.role !== "system")
       .map((message) => {
         return `${message.role}:\n${message.content}`;

@@ -22,7 +22,10 @@ export type AIMessage = {
   content: string;
 };
 
-export type AIPrompt = AIMessage[];
+export type AIPrompt = {
+  useHighThinking:boolean;
+  parts:AIMessage[];
+} 
 
 // ----------------------------------------
 // Tools

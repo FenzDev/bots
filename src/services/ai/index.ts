@@ -23,7 +23,7 @@ export async function runAIApp<TInput, TContext, TResult>(
   input: TInput,
   instruction: string,
   onResponse?: (result: TResult | string) => void | Promise<void>,
-): Promise<TResult|String> {
+): Promise<TResult|string> {
   let context = (await app.buildContext(input));
 
   for (let step = 0; step < MAX_STEPS; step++) {

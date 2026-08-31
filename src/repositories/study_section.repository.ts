@@ -11,7 +11,7 @@ export type StudySection = {
   timetableBroadcastThreadId?: number | null;
   timetableGID?: string;
   timetableCurrentHash?: string;
-  timetableCurrentCSV?: string;
+  timetableCurrentGridJSON?: string;
 
   updatedAt: Date;
   insertedAt: Date;

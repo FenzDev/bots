@@ -1,133 +1,427 @@
-# Instructions
+## Timetable Comparison
 
 Compare **Table A** and **Table B** and determine whether there are any **meaningful timetable changes**.
 
-Table A is the old timetable.
-Table B is the new timetable.
+* **Table A** is the old timetable.
+* **Table B** is the new timetable.
+* Both tables are provided as normalized JSON 2D arrays.
+* Each outer array represents a row.
+* Each inner array represents the cells/columns of that row.
+
+Example:
+
+```json
+[
+  ["", "A", "B", "C", "D"],
+  ["1", "", "", "8H00", "9H35"],
+  ["2", "Sunday", "G1", "Lecture: Analysis\nBenmesbah"],
+  ["3", "Sunday", "G2", "Lecture: Analysis\nBenmesbah"]
+]
+```
+
+**Do not assume that a timetable always starts with a particular row, column, day, group, or time.**
+
+The position and structure of the timetable can vary between files.
 
 The system already defines the required response schema. Follow that schema exactly.
 
-## 1. Compare timetable positions
+---
 
-Compare corresponding timetable cells using:
+## 1. Understand the grid before comparing it
 
-* Day of week
+First determine the semantic structure of each table.
+
+A timetable may contain:
+
+* Title rows.
+* Empty rows.
+* Header rows.
+* Column labels.
+* Time-slot headers.
+* Day names.
+* Group names.
+* Session cells.
+* Merged cells expanded into the normalized grid.
+* Additional information that is not part of the timetable.
+
+Do not assume that:
+
+* The first row contains times.
+* The first column contains days.
+* The second column contains groups.
+* Saturday is the first day.
+* Sunday is the first day.
+* Groups always use the same naming format.
+* Time slots always appear in the same row.
+* The timetable has the same dimensions in both versions.
+
+Infer the structure from the actual contents.
+
+---
+
+## 2. Compare timetable positions
+
+Compare corresponding **logical timetable positions**, using the information available in the grids:
+
+* Day
 * Group
 * Time slot
+* Session
 
-Identify differences between the old and new values.
+The physical row/column index is useful for locating cells, but it is **not automatically the semantic position**.
 
-A textual difference is not automatically a meaningful change. Determine whether the difference represents an actual scheduling change.
+For example, if Table A has:
 
-## 2. Meaningful changes
+```text
+Monday | G1 | 9H35 | Tutorial Algebra
+```
 
-A change is meaningful when the timetable assignment or position of a session changes.
+and Table B has:
 
-Examples:
+```text
+Monday | G1 | 11H10 | Tutorial Algebra
+```
 
-* A new session is added to a previously empty slot.
-* An existing session is removed.
-* One session is replaced by another.
-* A session moves to another time.
-* A session moves to another day.
-* A session moves between groups.
-* A teacher changes.
-* A subject changes.
-* A session's timetable position changes even if its text remains identical.
+the session moved even if the text is identical.
 
-## 3. Detect cell shifts caused by CSV/comma structure
+Report this as a meaningful movement.
 
-**Important: a text value that appears to have shifted from one cell/column to another must be treated as an actual cell-position change.**
+---
 
-CSV data may contain malformed rows, misplaced commas, missing commas, or other structural issues. A session can therefore appear in a different timetable column while the session text itself remains unchanged.
+## 3. Detect structural cell shifts
+
+A session can move to another cell because the source spreadsheet changed its structure.
 
 For example:
 
 Table A:
 
 ```text
-Monday,A1,,Tutorial Algebra,,,
+Monday | G1 | 9H35 | Tutorial Algebra
 ```
 
 Table B:
 
 ```text
-Monday,A1,,,Tutorial Algebra,,
+Monday | G1 | 11H10 | Tutorial Algebra
 ```
 
-Even though the text `Tutorial Algebra` itself has not changed, its **time-slot position has changed**.
+The session text did not change, but its timetable position changed.
 
-Treat this as a meaningful timetable change.
+This is a real timetable change.
 
-When detecting such a shift:
+Likewise, if a value moves between columns or rows while its text remains identical, determine whether the move represents a change in:
 
-* Identify the original cell position.
-* Identify the new cell position.
-* Use the timetable headers to determine the old and new time.
-* Report the session as having moved.
-* Do not dismiss the change merely because the cell text is identical.
+* Day
+* Group
+* Time
+* Session position
 
-This rule has high priority when a value clearly moved between timetable cells.
+If it does, report it.
 
-## 4. Ignore meaningless textual differences
+---
 
-Return an empty changes array when differences have no meaningful scheduling significance.
+## 4. Meaningful changes
+
+A change is meaningful when the actual timetable assignment changes.
 
 Examples:
 
-* Capitalization changes:
+### Addition
 
-  * `Algo1` → `ALGO1`
-* Minor whitespace changes.
-* Different line breaks inside the same cell.
-* CSV quoting differences.
-* Formatting-only differences.
-* Equivalent textual formatting.
-* Differences that do not change the actual session or its timetable position.
+An empty timetable position becomes:
 
-When in doubt, prefer **no change** rather than reporting a false positive, **unless there is clear evidence that a session changed its timetable position**.
+```text
+Tutorial Algebra
+```
 
-## 5. Incomplete or messy timetable entries are valid
+### Removal
 
-Timetable data may be incomplete, inconsistent, abbreviated, informal, or unprofessional.
+A timetable position containing:
 
-A session may contain:
+```text
+Tutorial Algebra
+```
 
-* A subject but no teacher.
-* A teacher but an unclear subject.
-* A subject with unusual spelling.
-* A subject with no room.
-* A teacher with no room.
-* Partial information.
-* Informal or unprofessional wording.
+becomes empty.
 
-Do not reject a meaningful change because the source entry is incomplete or poorly written.
+### Replacement
 
-If a meaningful change can be identified, report the information that is actually available.
+```text
+Analysis — Benmesbah
+```
+
+becomes:
+
+```text
+Algebra — Bouderbala
+```
+
+### Teacher change
+
+```text
+Analysis — Benmesbah
+```
+
+becomes:
+
+```text
+Analysis — Abdelli
+```
+
+### Subject change
+
+```text
+Lecture: Analysis
+```
+
+becomes:
+
+```text
+Lecture: Algebra
+```
+
+### Time movement
+
+```text
+Monday / G1 / 9H35
+```
+
+becomes:
+
+```text
+Monday / G1 / 11H10
+```
+
+### Day movement
+
+```text
+Sunday / G1 / 9H35
+```
+
+becomes:
+
+```text
+Monday / G1 / 9H35
+```
+
+### Group movement
+
+```text
+Monday / G1 / 9H35
+```
+
+becomes:
+
+```text
+Monday / G2 / 9H35
+```
+
+---
+
+## 5. Check the entire timetable
+
+**Do not stop after finding the first change.**
+
+Compare the complete timetable and identify **all meaningful changes**.
+
+If there are two independent changes, return two change objects.
+
+For example, if:
+
+1. `Analysis` is removed from G1 at 9H35.
+2. `Algebra` is added to G2 at 11H10.
+
+both changes must be returned.
+
+Never return only the first detected difference.
+
+---
+
+## 6. Distinguish movement from removal + addition
+
+When the same logical session appears in another timetable position, prefer reporting it as a **MOVEMENT** rather than treating it as two unrelated changes.
 
 For example:
+
+Table A:
+
+```text
+Monday / G1 / 9H35 = Tutorial Algebra — Benmesbah
+```
+
+Table B:
+
+```text
+Monday / G1 / 11H10 = Tutorial Algebra — Benmesbah
+```
+
+Prefer:
+
+```text
+MOVEMENT
+```
+
+rather than:
+
+```text
+REMOVAL
+ADDITION
+```
+
+However, do not assume two similar-looking sessions are the same session if the evidence does not support that conclusion.
+
+---
+
+## 7. Merged cells
+
+The normalized grid may contain values repeated across multiple positions because the original HTML contained `rowspan` or `colspan`.
+
+Do not automatically interpret repeated values as multiple independent sessions.
+
+Consider the surrounding:
+
+* Day
+* Group
+* Time
+* Rows
+* Columns
+* Other session information
+
+to determine whether the value represents one merged timetable assignment or multiple assignments.
+
+A session spanning multiple groups or time slots may therefore legitimately appear in several normalized cells.
+
+---
+
+## 8. Empty cells
+
+Treat empty strings and cells containing only whitespace as empty.
+
+For example:
+
+```json
+["Monday", "G1", ""]
+```
+
+contains an empty timetable cell.
+
+Do not report meaningless changes involving only empty cells.
+
+---
+
+## 9. Ignore meaningless textual differences
+
+Do not report a timetable change when only formatting changed.
+
+Ignore differences such as:
+
+* Capitalization.
+* Leading/trailing whitespace.
+* Multiple spaces.
+* Different line breaks.
+* HTML formatting.
+* CSV quoting.
+* Minor formatting differences.
+
+For example:
+
+```text
+Tutorial Algebra
+```
+
+and:
+
+```text
+Tutorial Algebra
+```
+
+with different whitespace or line wrapping should normally represent the same session.
+
+---
+
+## 10. Understand obvious spelling variations
+
+Timetable data can contain spelling mistakes and inconsistent formatting.
+
+Examples:
+
+```text
+Algebra
+Algerba
+```
+
+may represent the same subject when the surrounding context clearly confirms this.
+
+Likewise:
+
+```text
+Algo1
+ALGO1
+Algo 1
+```
+
+may represent the same subject.
+
+Do not report a change solely because of an obvious typo, capitalization difference, or formatting difference.
+
+However, do not silently treat genuinely different subjects or teachers as equivalent.
+
+---
+
+## 11. Messy and incomplete entries are valid
+
+Timetable entries may be incomplete or inconsistent.
+
+Examples:
 
 ```text
 Lab Algo1
 ```
 
-is still a valid session even if no teacher is provided.
+```text
+Tutorial Algebra
+```
 
-Never invent a missing teacher, subject, room, or other information.
+```text
+Benmesbah
+```
 
-## 6. Extract information for each meaningful change
+```text
+Lecture: Analysis
+Benmesbah
+108/2
+```
 
-For every meaningful changed cell or moved session, determine:
+A session does not need to contain all of:
 
-* **Subject**
-* **Teacher**, if explicitly available
-* **Time**
-* **Day of the week**
-* **Groups concerned**
+* Subject
+* Teacher
+* Room
+
+to be valid.
+
+If a meaningful change can be detected, report the information that is available.
+
+**Never invent missing information.**
+
+---
+
+## 12. Extract change information
+
+For every meaningful change, determine the available:
+
+* Subject
+* Teacher
+* Time
+* Day
+* Groups involved
+* Change type
+* Change detail
 
 ### Subject
 
-Extract the subject/course from the session text when possible.
+Extract the subject/course when it can be identified.
 
 Examples:
 
@@ -138,190 +432,316 @@ Examples:
 * Electronique Fondamental
 * IA
 
-Understand obvious spelling mistakes when the intended subject is clear, but do not invent or guess a subject.
+Do not invent a subject when it cannot be determined.
 
 ### Teacher
 
-Extract the teacher's name when explicitly present.
+Extract the teacher only when explicitly supported by the timetable.
 
-If no teacher is present, leave the teacher unavailable according to the response schema.
-
-Do not infer a teacher from another session merely because the subject is the same.
+Do not infer a teacher from another session.
 
 ### Time
 
-The time must come from the timetable column header.
+Determine the time from the timetable's actual time-slot headers.
 
-For a cell shift, use the **new time slot** as the current time and identify the previous time when the schema supports reporting the old position.
+Do not assume a fixed column contains time.
 
-Never infer the time from the text if a timetable header provides it.
+If a session moved, report the relevant old and new time when the response schema allows it.
 
 ### Day
 
 Determine the day from the timetable structure.
 
+Do not assume a fixed row or column contains the day.
+
 ### Groups
 
-Determine the group associated with the changed cell.
+Determine the group associated with the session.
 
-If the same logical change affects several groups, identify all groups concerned.
+If the session applies to all groups, use the schema's `ALL` value.
 
-## 7. Added sessions
+If several groups are affected by the same logical change, include all relevant groups.
 
-If Table A contains an empty cell and Table B contains a meaningful session, this is normally a meaningful addition.
+---
 
-Example:
+## 13. Comparing differently shaped grids
 
-```text
-Table A:
-Monday / A6 / 9:35 = empty
+Table A and Table B may have different:
 
-Table B:
-Monday / A6 / 9:35 = Tutorial Algebra bouderbala 8 /2
-```
+* Numbers of rows.
+* Numbers of columns.
+* Header positions.
+* Empty rows.
+* Empty columns.
+* Day ordering.
+* Group ordering.
 
-This is a meaningful change.
+Do not consider these structural differences meaningful by themselves.
 
-The absence of a teacher does not make the change invalid.
-
-## 8. Removed sessions
-
-If Table A contains a meaningful session and the corresponding cell in Table B is empty, this is normally a meaningful removal.
-
-Use Table A to identify the removed session.
-
-## 9. Modified or replaced sessions
-
-If both corresponding cells contain sessions but their actual scheduling information differs, determine whether the difference is meaningful.
-
-Example:
-
-```text
-Analysis — Abdelli
-```
-
-becoming:
-
-```text
-Algebra — Bouderbala
-```
-
-is meaningful.
-
-However:
-
-```text
-Abdelli
-```
-
-becoming:
-
-```text
-ABDELLI
-```
-
-is not meaningful by itself.
-
-## 10. Session movement
-
-A session movement is a meaningful change even if the session text is exactly the same.
+Instead, map each table to its logical timetable structure and compare the actual timetable assignments.
 
 For example:
 
-```text
 Table A:
-Monday / A4 / 9:35 = Tutorial Algebra
+
+```text
+Sunday
+Monday
+Tuesday
+```
 
 Table B:
-Monday / A4 / 11:10 = Tutorial Algebra
-```
-
-The text is identical, but the session moved from one time slot to another.
-
-Report this as a timetable change.
-
-The same principle applies when a session moves:
-
-* Between days.
-* Between groups.
-* Between time slots.
-* Due to an apparent comma/cell shift.
-
-## 11. Multiple changes
-
-Check the **entire timetable**.
-
-Do not stop after finding the first difference.
-
-For every meaningful change, identify the relevant:
-
-* Subject
-* Teacher
-* Time
-* Day
-* Group(s)
-* Change type or movement, as supported by the schema
-
-## 12. Do not over-normalize
-
-Understand obvious variations without treating every textual variation as a real change.
-
-For example, these may represent the same session:
 
 ```text
-Tutorial Algebra
-Tutorial Algerba
+Saturday
+Sunday
+Monday
+Tuesday
 ```
 
-if the surrounding timetable context clearly indicates that `Algerba` is simply a typo for `Algebra`.
+The addition of Saturday does not mean that every existing session moved.
 
-Likewise, capitalization, whitespace, and line wrapping should normally be ignored.
+Likewise, an inserted title row does not mean that every timetable entry changed.
 
-However, if a textual difference changes the actual subject, teacher, session, or timetable position, treat it as meaningful.
+---
 
-## 13. Do not guess
+## 14. Do not rely only on identical coordinates
+
+A timetable entry may appear at a different physical `[row][column]` coordinate because:
+
+* A row was inserted.
+* A column was inserted.
+* Days were reordered.
+* Groups were reordered.
+* Headers changed.
+* Merged cells changed.
+* The spreadsheet layout changed.
+
+Do not report every coordinate difference as a timetable change.
+
+First determine the semantic position.
+
+However, once a session is clearly identified as having changed its semantic position, report it as a meaningful change.
+
+---
+
+## 15. Do not guess
 
 Only use information supported by the tables.
 
 Never invent:
 
-* Teachers
-* Subjects
-* Rooms
-* Groups
-* Times
-* Days
-* Relationships between sessions
+* Teachers.
+* Subjects.
+* Rooms.
+* Groups.
+* Times.
+* Days.
+* Session relationships.
 
-If information is missing, preserve the known information and leave the missing field unavailable according to the schema.
+When information is unavailable, leave it unavailable according to the response schema.
 
-## 14. Empty result
+---
 
-If there are no meaningful timetable changes, return the schema's **empty array**.
+## 16. Empty result
+
+If there are no meaningful timetable changes, return the schema's empty array.
 
 An empty result is correct when:
 
 * Only capitalization changed.
 * Only whitespace changed.
+* Only line breaks changed.
 * Only formatting changed.
-* Only CSV quoting changed.
-* A cell technically differs but contains no meaningful timetable information.
-* The textual content is equivalent and remains in the same timetable position.
-* No actual session was added, removed, modified, or moved.
+* Only the physical grid coordinates changed because of inserted structural rows/columns.
+* Equivalent timetable information remains in the same logical position.
+* No session was added, removed, modified, or moved.
 
-Do **not** force a change into the result simply because two raw CSV strings differ.
+Do not force a change simply because the two JSON grids are different.
 
-## 15. Decision priority
+---
 
-Use the following order when analyzing the tables:
+## 17. Multiple changes are required
 
-1. Parse the timetable structure.
-2. Identify differences between corresponding cells.
-3. Determine whether each difference represents a meaningful scheduling change.
-4. Check for sessions that shifted between cells because of commas or CSV structure.
-5. Treat a clear cell-position shift as a real change even when the text itself is unchanged.
-6. Ignore superficial textual differences.
-7. For meaningful changes, extract the available subject, teacher, time, day, and groups.
-8. Never invent missing information.
-9. Check the complete timetable for all changes.
-10. If no meaningful changes remain, return the schema's empty array.
+**The output must contain every meaningful change found in the complete timetable.**
+
+For example, if the timetable contains:
+
+```text
+Change 1:
+Sunday / G1 / 8H00
+Analysis → removed
+
+Change 2:
+Monday / G2 / 11H10
+Algebra → added
+```
+
+the result must contain **both** changes.
+
+Do not stop after finding one change.
+
+Before returning the result, perform a second pass over the complete tables and verify that no other meaningful changes were missed.
+
+---
+
+## 18. Change type
+
+Use only the change types supported by the response schema:
+
+* `ADDITION`
+* `REMOVAL`
+* `MOVEMENT`
+
+Use:
+
+* `ADDITION` when a new timetable assignment appears.
+* `REMOVAL` when an existing timetable assignment disappears.
+* `MOVEMENT` when an existing session changes its timetable position.
+
+A teacher or subject modification should be represented using the most appropriate supported change type and explained clearly in `changeDetail`.
+
+The fallback/default change type is:
+
+```text
+MOVEMENT
+```
+
+when the change is meaningful but does not cleanly fit `ADDITION` or `REMOVAL`.
+
+---
+
+## 19. Change detail formatting
+
+The `changeDetail` field is displayed directly to users in a Telegram message.
+
+You may use Markdown-style `**bold**` formatting to make important information easier to read.
+
+Prefer highlighting important timetable information such as:
+
+* **Subject**
+* **Teacher**
+* **Old time → New time**
+* **Old day → New day**
+* **Old group → New group**
+
+For example:
+
+```text
+**Analysis** with **Benmesbah** moved from **Sunday 9H35** to **Monday 11H10**.
+```
+
+For an addition:
+
+```text
+Added **Tutorial Algebra** with **Bouderbala** at **Monday 11H10**.
+```
+
+For a removal:
+
+```text
+Removed **Lecture Analysis** with **Benmesbah** from **Sunday 8H00**.
+```
+
+Keep the description concise and human-readable.
+
+Do not use excessive formatting. Use `**bold**` only for information that helps the user quickly understand what changed.
+
+Do not use Markdown tables, headings, code blocks, or other complex Markdown inside `changeDetail`.
+
+## 20. Consolidate changes
+
+Report **logical timetable changes**, not individual cell differences.
+
+### Movement takes priority
+
+If the same session appears in Table A and Table B but at a different day, time, or group, report **one `MOVEMENT`** instead of a `REMOVAL` + `ADDITION`.
+
+For example:
+
+```text
+Table A: Tuesday / G1,G2,G3 / 9H35 = Lecture IA — Chettat
+Table B: Wednesday / G1,G2,G3 / 12H45 = Lecture IA — Chettat
+```
+
+Report:
+
+```text
+MOVEMENT
+groupsInvolved: ["ALL"]
+changeDetail: "**Lecture IA** with **Chettat** moved from **Tuesday 9H35** to **Wednesday 12H45**."
+```
+
+Do **not** report three separate additions for G1, G2, and G3.
+
+### Groups
+
+`groupsInvolved` represents the groups logically affected.
+
+If **every group in the timetable** is affected, use:
+
+```text
+["ALL"]
+```
+
+Do not list every group individually in that case.
+
+If only some groups are affected, list them individually.
+
+### Merge duplicates
+
+Combine changes that describe the same logical session.
+
+For example:
+
+```text
+ADDITION G1 Wednesday 12H45
+ADDITION G2 Wednesday 12H45
+ADDITION G3 Wednesday 12H45
+```
+
+should become one:
+
+```text
+ADDITION ["G1", "G2", "G3"] Wednesday 12H45
+```
+
+Use `["ALL"]` if those are all groups in the timetable.
+
+### Priority
+
+When a session exists in both tables:
+
+1. `MOVEMENT` — changed position.
+2. `REMOVAL` — disappeared.
+3. `ADDITION` — genuinely new session.
+
+Always perform a final consolidation pass and ensure each logical change appears **only once**.
+
+
+## 21 Final verification
+
+Before producing the response:
+
+1. Understand the structure of Table A.
+2. Understand the structure of Table B.
+3. Identify the logical day/group/time/session relationships.
+4. Compare the complete timetable.
+5. Detect additions.
+6. Detect removals.
+7. Detect replacements or modifications.
+8. Detect session movements.
+9. Detect sessions whose physical grid position changed but whose semantic position did not.
+10. Detect sessions whose semantic position changed even when their text stayed identical.
+11. Check all days.
+12. Check all groups.
+13. Check all time slots.
+14. Check for multiple independent changes.
+15. Remove superficial formatting-only differences.
+16. Do not invent missing information.
+17. Verify that **every meaningful change has been included**.
+18. If no meaningful changes remain, return the schema's empty array.
+19. Formatting with ** for making certain words bolder are allowed reasonably.
+20. Always perform a final consolidation pass and ensure each logical change appears only once.
+
+The goal is to identify **real timetable changes**, not raw JSON differences.

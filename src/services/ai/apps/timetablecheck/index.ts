@@ -29,8 +29,7 @@ const timetableCheckAIResultSchema = z.object({
         ]),
       ),
       changeDetail: z.string(),
-      from: z.string().optional(),
-      to: z.string().optional(),
+      changeType: z.enum(['REMOVAL','MOVEMENT','ADDITION'])
     }),
   ),
 });
@@ -39,8 +38,8 @@ export type TimetableCheckAIResult = z.infer<
   typeof timetableCheckAIResultSchema
 >;
 export type TimetableCheckAIInput = {
-  tableACSV: string;
-  tableBCSV: string;
+  tableAGridJSON: string;
+  tableBGridJSON: string;
 };
 
 type TimetableCheckAIContext = TimetableCheckAIInput;
@@ -75,43 +74,44 @@ export class TimetableCheckAIApp implements AIApplication<
     context,
     instruction,
   }: AIRawPayload<TimetableCheckAIInput>): AIPrompt {
-
     const resultFormat = this.resultSchema
       ? JSON.stringify(this.resultSchema.toJSONSchema(), null, 2)
       : undefined;
 
-
-    return [
-      {
-        role: "system",
-        content: `# Personality
+    return {
+      useHighThinking: true,
+      parts: [
+        {
+          role: "system",
+          content: `# Personality
 ${this.personality}`,
-      },
-      {
-        role: "system",
-        content: `# Instruction
+        },
+        {
+          role: "system",
+          content: `# Instruction
 ${instruction}`,
-      },
-      {
-        role: "system",
-        content: `# Result format
+        },
+        {
+          role: "system",
+          content: `# Result format
 Follow the exact format, when you output any text.
 ${resultFormat ?? "No structured result format required."}
 `,
-      },
-      {
-        role: "user",
-        content: `# Table A (the old/previous csv table)
-${context.tableACSV}
+        },
+        {
+          role: "user",
+          content: `# Table A (the old/previous csv table)
+${context.tableAGridJSON}
         `,
-      },
-      {
-        role: "user",
-        content: `# Table B (the new/possibly-changed csv table)
-${context.tableBCSV}
+        },
+        {
+          role: "user",
+          content: `# Table B (the new/possibly-changed csv table)
+${context.tableBGridJSON}
         `,
-      },
-    ];
+        },
+      ],
+    };
   }
   addToolResult(
     context: TimetableCheckAIInput,
