@@ -23,9 +23,9 @@ const botHandlers = [
 ] as const;
 
 export async function handleBots(systemHandle:(bot:Bot)=>Promise<void>|void) {
-  for (const [name,bot] of botHandlers)
-  {
-    try {
+  try {
+    for (const [name,bot] of botHandlers)
+      {
       await systemHandle(bot);
 
       const handlersDirectory = fileURLToPath(
@@ -33,10 +33,27 @@ export async function handleBots(systemHandle:(bot:Bot)=>Promise<void>|void) {
       );
 
       const {num,maxNum} = await loadHandlers(bot, handlersDirectory);
-
+      
       logger.info(`${num}/${maxNum} ${name} handlers were loaded.`);
-    } catch (err) {
-      logger.error({ err }, `${name} handlers were not loaded.`);
     }
-  };
+    {
+      const sharedHandlersDirectory = fileURLToPath(
+        new URL(`../../handlers/shared/`, import.meta.url),
+      );
+      const uniqueBots = new Set<string>();
+      let {num,maxNum} = {num:0,maxNum:0};
+      for (const [name,bot] of botHandlers) {
+        if (uniqueBots.has(bot.token)) continue;
+        
+        ({num,maxNum} = await loadHandlers(bot, sharedHandlersDirectory));
+        
+        if (num !== maxNum) break;
+
+        uniqueBots.add(bot.token);
+      }
+      logger.info(`${num}/${maxNum} shared handlers were loaded.`);
+    }
+  } catch (err) {
+    logger.error({ err }, `${name} handlers were not loaded.`);
+  }
 }

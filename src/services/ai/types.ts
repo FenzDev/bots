@@ -28,7 +28,7 @@ export type AIPrompt = AIMessage[];
 // Tools
 // ----------------------------------------
 
-export type AITool<TArgs = unknown> = {
+export type AITool<TContext = unknown,TArgs = unknown> = {
   name: string;
   description: string;
 
@@ -36,7 +36,7 @@ export type AITool<TArgs = unknown> = {
 
   schema: z.ZodType<TArgs>;
 
-  execute: (args: TArgs) => Promise<JSONValue> | JSONValue;
+  execute: (context:TContext, args: TArgs) => Promise<JSONValue> | JSONValue;
 };
 
 export type AIToolCall = {

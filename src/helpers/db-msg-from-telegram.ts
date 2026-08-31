@@ -10,8 +10,7 @@ import type {
   VoiceMessage,
 } from "../repositories/message.repository";
 
-import type { Message,User } from "grammy/types";
-
+import type { Message, User } from "grammy/types";
 
 export function dbMessageFromTelegramMessage(
   message: Message,
@@ -29,11 +28,15 @@ export function dbMessageFromTelegramMessage(
 
   const base = {
     ...scope,
+    replyTargetId:
+      message.reply_to_message?.message_id === scope.threadId
+        ? null
+        : message.reply_to_message?.message_id,
     messageId: message.message_id,
     senderId: message.from.id,
     sentAt: new Date(message.date * 1000),
     storedAt: new Date(),
-  };
+  } as DbMessage;
 
   if ("text" in message) {
     const result: TextMessage = {
