@@ -7,7 +7,7 @@ export default async (bot: Bot) => {
   bot
     .filter((ctx) => ctx.from?.id === TELEGRAM_SUPERADMIN_ID)
     .command("ping", async (ctx, next) => {
-      logger.info('/ping acknoledged');
+      logger.info('/ping acknowledged');
       await replyToMessage(ctx, 'pong');
       logger.info('pong was sent back');
 

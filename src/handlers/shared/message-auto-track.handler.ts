@@ -54,6 +54,8 @@ export default async (bot: Bot) => {
 
     const telegramMessage = res.result as Message;
 
+    if (telegramMessage.receiver_user) return res;
+
     const dbMessage = dbMessageFromTelegramMessage(telegramMessage);
 
     if (dbMessage) {

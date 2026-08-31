@@ -4,9 +4,7 @@ import { trackMessage } from "../shared/message-auto-track.handler.js";
 
 export default async (bot: Bot) => {
   bot.on("message", async (ctx, next) => {
-    if (ctx.chat.id === ctx.from?.id) {
-      return next();
-    }
+    if (ctx.message.receiver_user) return next();
 
     const dbMessage = dbMessageFromTelegramMessage(ctx.msg);
 
