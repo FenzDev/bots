@@ -1,7 +1,7 @@
 import z from "zod";
 import logger from "../lib/logger";
 import { configDotenv } from "dotenv";
-import { telegramTargetSchema } from "./schemas";
+import { cronSchema, telegramTargetSchema } from "./schemas";
 
 configDotenv({ quiet: true });
 
@@ -19,6 +19,7 @@ const envSchema = z.object({
   MONGODB_URI: z.string(),
   DB_MAX_HISTORY_MESSAGES: z.coerce.number(),
   GOOGLE_AI_API_KEY: z.string(),
+  TIMETABLE_CHECK_SCHEDULE: cronSchema,
 });
 
 const result = envSchema.safeParse(process.env);
@@ -43,6 +44,8 @@ export const {
   TELEGRAM_SUPERADMIN_USERNAME,
   
   DB_MAX_HISTORY_MESSAGES,
+
+  TIMETABLE_CHECK_SCHEDULE,
   
   MONGODB_URI,
   GOOGLE_AI_API_KEY,

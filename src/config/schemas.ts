@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { CronExpressionParser } from "cron-parser";
+
 
 export const telegramTargetSchema = z
   .string()
@@ -17,5 +19,19 @@ export const telegramTargetSchema = z
         : undefined,
     };
   });
+
+export const cronSchema = z.string().trim().refine(
+  (value) => {
+    try {
+      CronExpressionParser.parse(value);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  {
+    message: "Invalid cron expression",
+  }
+);
 
 export type TelegramTarget = z.infer<typeof telegramTargetSchema>;

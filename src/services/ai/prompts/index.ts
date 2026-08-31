@@ -23,5 +23,7 @@ function definePrompts<
 
 export const prompts = definePrompts(
   readPrompt("personalities/chillbot"),
+  readPrompt("personalities/timetablebot"),
+  readPrompt("instructions/timetablebot/compare"),
   readPrompt("instructions/chillbot/replyToMentions"),
 );
