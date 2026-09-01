@@ -35,12 +35,18 @@ const timetableCheckAIResultSchema = z.object({
           "G10",
         ]),
       ),
-      subjectInvolved:z.string(),
+      subjectTitle:z.string(),
+      sessionType:z.enum([
+        'LECTURE',
+        'TUTORIAL',
+        'LAB',
+        'NONE'
+      ]),
       changeTarget: z.nullable(z.enum([
         'WHOLE_SESSION',
+        'TIME',
         'DAY+TIME',
         'CLASSROOM',
-        'CLASSROOM+DAY+TIME',
         'TEACHER',
       ])),
       from:z.nullable(timetableSessionSchema),
@@ -49,9 +55,13 @@ const timetableCheckAIResultSchema = z.object({
   ),
 });
 
+export type TimetableSession = z.infer<
+  typeof timetableSessionSchema
+>;
 export type TimetableCheckAIResult = z.infer<
   typeof timetableCheckAIResultSchema
 >;
+
 export type TimetableCheckAIInput = {
   tableAGridJSON: string;
   tableBGridJSON: string;

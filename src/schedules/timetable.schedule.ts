@@ -9,10 +9,16 @@ import {
 import { downloadBuffer, downloadText } from "../utils/download";
 import { runtimeConfig } from "../repositories/runtime_config.repository";
 import { createHash } from "crypto";
-import { TIMETABLE_CHECK_SCHEDULE } from "../config/env";
+import {
+  TELEGRAM_TIMETABLEBOT_USERNAME,
+  TIMETABLE_CHECK_SCHEDULE,
+} from "../config/env";
 import { runAIApp, timetableAIApp } from "../services/ai";
 import { prompts } from "../services/ai/prompts";
-import { TimetableCheckAIResult } from "../services/ai/apps/timetablecheck";
+import {
+  TimetableCheckAIResult,
+  TimetableSession,
+} from "../services/ai/apps/timetablecheck";
 import { unzipHtmlFiles, ZipHtmlFile } from "../utils/timetable/unzipHtml";
 import { extractTables } from "../utils/timetable/extractTables";
 import { cleanTable } from "../utils/timetable/cleanTable";
@@ -91,7 +97,8 @@ cron.schedule(
       const updatedTimetables: SectionUpdate[] = [];
 
       const { timetablesId } = await runtimeConfig.get();
-      const baseDownloadUrl = `https://docs.google.com/spreadsheets/d/${timetablesId}/export`;
+      const baseUrl = `https://docs.google.com/spreadsheets/d/${timetablesId}`;
+      const baseDownloadUrl = `${baseUrl}/export`;
 
       // Check for any update.
       for (const section of sections) {
@@ -238,17 +245,24 @@ cron.schedule(
 
         while ((update = updatedTimetables.shift())) {
           if (!update.aiResponse) {
-            logger.debug('AI decided to discard change.')
+            logger.debug("AI decided to discard change.");
             continue;
           }
 
           logger.debug("Broadcasting the update");
 
+          const pdfUrl = `https://t.me/${TELEGRAM_TIMETABLEBOT_USERNAME}?start=${update.section.name}`;
+          const sourceUrl = `${baseUrl}/edit?gid=${update.section.timetableGID}`;
+
           await chillBot.api.sendMessage(
             update.section.timetableBroadcastChatId!,
-            `🚨 Timetable was updated! 📅 🚨\n${JSON.stringify(
-              update.aiResponse,
-            )}`,
+            `
+🚨📅 لقد تم تحديث جدول توقيت ${update.section.displayShort} 🚨!
+📅 Timetable of ${update.section.displayShort} was updated!
+
+${aiResultToString(update.section, update.aiResponse)}
+
+[📄pdf](${pdfUrl}) [🔗source](${sourceUrl})`.trim().replace(/([_~`#+\-=|{}.!\\])/g, '\\$1'),
             {
               parse_mode: "Markdown",
               message_thread_id:
@@ -267,3 +281,38 @@ cron.schedule(
   },
   { logger },
 );
+
+function aiResultToString(
+  section: StudySection,
+  aiResponse: TimetableCheckAIResult,
+) {
+  return aiResponse.changesFromAtoB
+    .map((change) => {
+      const groups =
+        change.groupsInvolved.includes("ALL") ||
+        aiResponse.maxNumOfGroups === change.groupsInvolved.length
+          ? `#section #${section.displayShort?.trim().toUpperCase().replaceAll(" ", "_")}`
+          : change.groupsInvolved.map((g) => `#${g}`).join(" ");
+
+      const sessionTitle = `#${change.sessionTitleInvolved.trim().toUpperCase()}`;
+
+      let content;
+      if (!change.from) {
+      } else if (!change.to) {
+      } else {
+        const content =
+          change.changeTarget === "TEACHER"
+            ? `👨‍🏫 **${change.from.teacher} ➜ ${change.to.teacher}**`
+            : change.changeTarget === "CLASSROOM"
+              ? `📍 **${change.from.classroom} ➜ ${change.to.classroom}**`
+              : change.changeTarget === "DAY+TIME"
+                ? `🕑 **${change.from.day} ${change.from.startTime} ➜ ${change.to.day} ${change.to.startTime}**`
+                : change.changeTarget === "TIME"
+                  ? `🕑 **${change.from.startTime} ➜ ${change.to.startTime}**`
+                  : "${}";
+      }
+
+      return `> 🔴 ${sessionTitle} ${groups}\n> ${content}`;
+    })
+    .join("\n");
+}
