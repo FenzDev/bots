@@ -10,7 +10,14 @@ import {
 } from "../../types";
 import { prompts } from "../../prompts";
 
+const timetableSessionSchema = z.object({
+  teacher:z.string().optional(),
+  classroom:z.string().optional(),
+  startTime:z.string().optional(),
+  day:z.string().optional(),
+});
 const timetableCheckAIResultSchema = z.object({
+  maxNumOfGroups: z.number(),
   changesFromAtoB: z.array(
     z.object({
       groupsInvolved: z.array(
@@ -28,8 +35,16 @@ const timetableCheckAIResultSchema = z.object({
           "G10",
         ]),
       ),
-      changeDetail: z.string(),
-      changeType: z.enum(['REMOVAL','MOVEMENT','ADDITION'])
+      subjectInvolved:z.string(),
+      changeTarget: z.nullable(z.enum([
+        'WHOLE_SESSION',
+        'DAY+TIME',
+        'CLASSROOM',
+        'CLASSROOM+DAY+TIME',
+        'TEACHER',
+      ])),
+      from:z.nullable(timetableSessionSchema),
+      to:z.nullable(timetableSessionSchema),
     }),
   ),
 });

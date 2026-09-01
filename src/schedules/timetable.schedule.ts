@@ -60,10 +60,21 @@ async function parseTimetableZip(
   return result;
 }
 
+let timetableCheckRunning = false;
+
 cron.schedule(
   TIMETABLE_CHECK_SCHEDULE,
   async () => {
     try {
+      if (timetableCheckRunning) {
+        logger.warn(
+          "New timetable check schedule was interrupted because one is still running.",
+        );
+        return;
+      }
+
+      timetableCheckRunning = true;
+
       if (debugMode) {
         return;
       }
@@ -82,31 +93,74 @@ cron.schedule(
       const { timetablesId } = await runtimeConfig.get();
       const baseDownloadUrl = `https://docs.google.com/spreadsheets/d/${timetablesId}/export`;
 
-      // check for any update and push to updatedTimetables
+      // Check for any update.
       for (const section of sections) {
         if (!section.timetableBroadcastChatId) continue;
+
         const downloadUrl = `${baseDownloadUrl}?gid=${section.timetableGID}&format=csv`;
         const downloadedTimetableCSV = await downloadText(downloadUrl);
 
         const newHash = hashText(downloadedTimetableCSV);
 
-        if (newHash !== section.timetableCurrentHash) {
-          studySections.setStudySection({
-            name: section.name,
-            timetableCurrentHash: newHash,
-          });
-
-          logger.debug("Different Timetable is detected, running ai comparer.");
-
-          updatedTimetables.push({
-            section,
-            newHash,
-          });
+        if (newHash === section.timetableCurrentHash) {
+          continue;
         }
+
+        logger.debug(
+          { section: section.name },
+          "Different Timetable is detected, waiting for changes to settle.",
+        );
+
+        let stableHash = newHash;
+
+        while (true) {
+          await new Promise((resolve) => setTimeout(resolve, 10_000));
+
+          const latestCSV = await downloadText(downloadUrl);
+          const latestHash = hashText(latestCSV);
+
+          if (latestHash === stableHash) {
+            logger.debug(
+              {
+                section: section.name,
+                hash: stableHash,
+              },
+              "Timetable has stopped changing.",
+            );
+
+            break;
+          }
+
+          logger.debug(
+            {
+              section: section.name,
+              previousHash: stableHash,
+              newHash: latestHash,
+            },
+            "Timetable changed again while waiting, continuing debounce.",
+          );
+
+          stableHash = latestHash;
+        }
+
+        // IMPORTANT:
+        // Mark this hash as seen immediately after it has stabilized.
+        studySections.setStudySection({
+          name: section.name,
+          timetableCurrentHash: stableHash,
+        });
+
+        updatedTimetables.push({
+          section,
+          newHash: stableHash,
+        });
       }
-      // for each update download the html and pass each to ai to tell diff
+
+      // For each stable update, download the HTML and pass it to AI
+      // to determine the actual differences.
       if (updatedTimetables.length > 0) {
         const zipBuffer = await downloadBuffer(`${baseDownloadUrl}?format=zip`);
+
         const htmls = await parseTimetableZip(
           zipBuffer,
           (fileName) =>
@@ -119,26 +173,32 @@ cron.schedule(
           const htmlFile = htmls.find(
             (h) => h.sourceFile === `${timetable.section.name}.html`,
           );
+
           if (!htmlFile) {
             throw new Error(
               "The section name is not equivalent to any html file",
             );
           }
+
           if (!htmlFile.grid) {
             throw new Error("The grid wasn't properly parsed.");
           }
 
           timetable.newGridJSON = JSON.stringify(htmlFile.grid);
-          studySections.setStudySection({
-            name: timetable.section.name,
-            timetableCurrentGridJSON: timetable.newGridJSON,
-          });
 
           if (!timetable.section.timetableCurrentGridJSON) {
+            // No previous grid to compare against.
+            studySections.setStudySection({
+              name: timetable.section.name,
+              timetableCurrentHash: timetable.newHash,
+              timetableCurrentGridJSON: timetable.newGridJSON,
+            });
+
             continue;
           }
 
           for (let step = 0; step < 3; step++) {
+            logger.debug("Running AI checker ™.");
             const aiResult = await runAIApp(
               timetableAIApp,
               {
@@ -147,6 +207,7 @@ cron.schedule(
               },
               prompts["instructions/timetablebot/compare"],
             );
+
             if (typeof aiResult === "string") {
               logger.error(
                 { aiResult },
@@ -154,6 +215,7 @@ cron.schedule(
               );
               continue;
             }
+
             logger.debug(aiResult, "AI has responded.");
 
             if (aiResult.changesFromAtoB.length === 0) {
@@ -163,30 +225,30 @@ cron.schedule(
             timetable.aiResponse = aiResult;
             break;
           }
+
+          // Persist the stable hash/grid only after the debounce + comparison.
+          studySections.setStudySection({
+            name: timetable.section.name,
+            timetableCurrentHash: timetable.newHash,
+            timetableCurrentGridJSON: timetable.newGridJSON,
+          });
         }
 
         let update: SectionUpdate | undefined;
+
         while ((update = updatedTimetables.shift())) {
           if (!update.aiResponse) {
+            logger.debug('AI decided to discard change.')
             continue;
           }
 
           logger.debug("Broadcasting the update");
+
           await chillBot.api.sendMessage(
             update.section.timetableBroadcastChatId!,
-            `🚨 Timetable was updated! 📅 🚨\n${update.aiResponse?.changesFromAtoB
-              .map((change) => {
-                return `- ${change.groupsInvolved
-                  .map((g) => `#${g === "ALL" ? "SECTION" : g}`)
-                  .join(" ")}\n${
-                  change.changeType === "REMOVAL"
-                    ? "➖ "
-                    : change.changeType === "ADDITION"
-                      ? "➕ "
-                      : "🔁 "
-                } ${change.changeDetail}`;
-              })
-              .join("\n")}`,
+            `🚨 Timetable was updated! 📅 🚨\n${JSON.stringify(
+              update.aiResponse,
+            )}`,
             {
               parse_mode: "Markdown",
               message_thread_id:
@@ -199,6 +261,8 @@ cron.schedule(
       }
     } catch (err) {
       logger.error(err, "Error while checking timetable updates.");
+    } finally {
+      timetableCheckRunning = false;
     }
   },
   { logger },
