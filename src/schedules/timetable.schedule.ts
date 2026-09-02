@@ -23,7 +23,7 @@ import { unzipHtmlFiles, ZipHtmlFile } from "../utils/timetable/unzipHtml";
 import { extractTables } from "../utils/timetable/extractTables";
 import { cleanTable } from "../utils/timetable/cleanTable";
 import { normalizeGrid } from "../utils/timetable/normalizeGrid";
-import { parseTableGrid } from "../utils/timetable/parseTableGrid";
+import { parseTableGrid, TableGrid } from "../utils/timetable/parseTableGrid";
 import { resolveTimetableChanges } from "../utils/timetable/resolveTimetableChanges";
 
 function hashText(text: string): string {
@@ -65,6 +65,36 @@ async function parseTimetableZip(
   }
 
   return result;
+}
+
+function normalizeTimeString(str: string) {
+  const normalized = str.toLowerCase().replace(/\s+/g, "").replace("h", ":");
+
+  const [hours, minutes] = normalized.split(":");
+
+  return `${hours.padStart(2, "0")}:${minutes ?? "00"}`;
+}
+
+function parseTimetableGrid(grid:TableGrid) {
+  // identify the times row and each to their column
+  let startOfTimes:[number,number]|null = null;
+  for (let row = 1; row < grid.length; row++) {
+    for (let col = 0; col < grid[row].length; col++) {
+      if (grid[row][col].includes("8")) {
+        if (!normalizeTimeString(grid[row][col]).startsWith('08:')) continue;
+        startOfTimes = [row, col];
+      }
+    }
+  }
+  if (!startOfTimes) return null;
+}
+
+function findDifferences(gridA: TableGrid, gridB: TableGrid) {
+  
+
+  
+
+  return [];
 }
 
 let timetableCheckRunning = false;
