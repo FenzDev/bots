@@ -426,7 +426,137 @@ thats: 1
 
 ---
 
-## 14. Final rules
+## 14. 🚨 CRITICAL RULE: SHARED LECTURES / ALL-GROUP SESSIONS
+
+NEVER create individual G1, G2, G3, etc. changes when the affected session is a shared session for the whole section.
+They look individual in grid but actually they aren't.
+
+If a lecture/course/session is shared by ALL groups, it MUST be represented as ONE change with:
+
+"groupsInvolved": ["ALL"]
+
+You MUST NOT split that change into individual group changes.
+
+WRONG ❌
+
+If the shared Cours IA lecture moves from Monday 08:00 to Tuesday 09:35, DO NOT produce:
+
+❌ Cours IA - G1 → Tuesday 09:35
+❌ Cours IA - G2 → Tuesday 09:35
+❌ Cours IA - G3 → Tuesday 09:35
+
+And especially do NOT produce three separate to: null / from: null changes for G1, G2, and G3.
+
+CORRECT ✅
+
+Produce exactly ONE change:
+
+{
+  "groupsInvolved": ["ALL"],
+  "subjectTitle": "IA",
+  "sessionType": "LECTURE",
+  "from": {
+    "teacher": "...",
+    "classroom": "...",
+    "startTime": "08:00",
+    "day": "Monday"
+  },
+  "to": {
+    "teacher": "...",
+    "classroom": "...",
+    "startTime": "09:35",
+    "day": "Tuesday"
+  }
+}
+How to determine ALL
+
+Before creating group-specific changes, determine whether the session is a shared/common session.
+
+A lecture appearing as the same session for multiple groups, or a lecture whose timetable structure indicates that it applies to the entire section, should be treated as:
+
+"groupsInvolved": ["ALL"]
+
+rather than:
+
+"groupsInvolved": ["G1"]
+"groupsInvolved": ["G2"]
+"groupsInvolved": ["G3"]
+Shared session removal
+
+The same rule applies when a shared session disappears.
+
+If a lecture existed for the whole section in Table A and is completely absent in Table B, produce:
+
+{
+  "groupsInvolved": ["ALL"],
+  "subjectTitle": "IA",
+  "sessionType": "LECTURE",
+  "from": {
+    "teacher": "...",
+    "classroom": "...",
+    "startTime": "...",
+    "day": "..."
+  },
+  "to": null
+}
+
+NOT one removal per group.
+
+Shared session addition
+
+If a new lecture is introduced for the whole section:
+
+{
+  "groupsInvolved": ["ALL"],
+  "subjectTitle": "IA",
+  "sessionType": "LECTURE",
+  "from": null,
+  "to": {
+    "teacher": "...",
+    "classroom": "...",
+    "startTime": "...",
+    "day": "..."
+  }
+}
+Shared session modification
+
+If a shared lecture changes its teacher, classroom, day, or time, it is still ONE change:
+
+{
+  "groupsInvolved": ["ALL"],
+  "subjectTitle": "IA",
+  "sessionType": "LECTURE",
+  "from": {
+    "teacher": "Teacher A",
+    "classroom": "108/2",
+    "startTime": "08:00",
+    "day": "Monday"
+  },
+  "to": {
+    "teacher": "Teacher B",
+    "classroom": "201/1",
+    "startTime": "09:35",
+    "day": "Tuesday"
+  }
+}
+
+🚨 Before generating changesFromAtoB
+
+For every potential change, ask:
+
+"Is this session actually specific to one group, or is it a shared session for ALL groups?"
+
+If it is shared by the whole section:
+
+USE ["ALL"] AND CREATE ONLY ONE CHANGE.
+
+Do not create duplicate changes for G1, G2, G3, etc.
+
+A shared lecture changing once is ONE timetable change, regardless of how many groups attend it.
+
+The number of groups attending a session does NOT determine the number of change objects.
+
+## Final rules
 
 Think about the task as:
 
