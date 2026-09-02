@@ -297,7 +297,7 @@ function aiResultToString(
 
       const groups =
         change.groupsInvolved.includes("ALL") ||
-        aiResponse.maxNumOfGroups === change.groupsInvolved.length
+        aiResponse.numOfAllGroupsExistingInTable === change.groupsInvolved.length
           ? `#section #${section.displayShort?.trim().toLowerCase().replaceAll(" ", "_")}`
           : change.groupsInvolved.map((g) => `#${g.toLowerCase()}`).join(" ");
 

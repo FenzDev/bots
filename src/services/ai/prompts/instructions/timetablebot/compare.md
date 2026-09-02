@@ -14,7 +14,7 @@ The result must contain exactly:
 
 ```text
 {
-  "maxNumOfGroups": number,
+  "numOfAllGroupsExistingInTable": number,
   "changesFromAtoB": [
     {
       "groupsInvolved": ["ALL" | "G1" | ... | "G10"],
@@ -1106,41 +1106,9 @@ sessionType: "NONE"
 
 ---
 
-# 23. `maxNumOfGroups`
+# 23. `numOfAllGroupsExistingInTable`
 
-`maxNumOfGroups` is the **largest number of actual timetable groups affected by any single logical change**.
-
-Examples:
-
-```text
-groupsInvolved: ["G1", "G2", "G3"]
-```
-
-means:
-
-```text
-maxNumOfGroups: 3
-```
-
-If the largest affected set is:
-
-```text
-["G1", "G2", "G3", "G4"]
-```
-
-then:
-
-```text
-maxNumOfGroups: 4
-```
-
-If a change uses:
-
-```text
-["ALL"]
-```
-
-count the actual groups represented by `ALL`.
+`numOfAllGroupsExistingInTable` is the **largest number of groups actual timetable**.
 
 If the timetable contains G1 through G6:
 
@@ -1151,7 +1119,7 @@ If the timetable contains G1 through G6:
 means:
 
 ```text
-maxNumOfGroups: 6
+numOfAllGroupsExistingInTable: 6
 ```
 
 If the timetable contains G1 through G10:
@@ -1163,13 +1131,13 @@ If the timetable contains G1 through G10:
 means:
 
 ```text
-maxNumOfGroups: 10
+numOfAllGroupsExistingInTable: 10
 ```
 
 If there are no meaningful changes:
 
 ```text
-maxNumOfGroups: 0
+numOfAllGroupsExistingInTable: ..
 changesFromAtoB: []
 ```
 
@@ -1207,7 +1175,7 @@ If Table A and Table B contain the same logical timetable and there are no meani
 
 ```text
 {
-  "maxNumOfGroups": 0,
+  "numOfAllGroupsExistingInTable": ..,
   "changesFromAtoB": []
 }
 ```
@@ -1239,7 +1207,7 @@ Internally follow this plan:
 7. Compare matched sessions.
 8. Create the smallest meaningful change.
 9. Merge duplicate/group-equivalent changes.
-10. Calculate `maxNumOfGroups`.
+10. Calculate `numOfAllGroupsExistingInTable`.
 11. Validate the final object against the schema.
 
 Do not spend excessive reasoning on obvious cases.
@@ -1278,7 +1246,7 @@ Before returning the result, quickly verify:
 17. Modified sessions contain only fields that actually changed.
 18. Additions use `from: null`.
 19. Removals use `to: null`.
-20. `maxNumOfGroups` is correct.
+20. `numOfAllGroupsExistingInTable` is correct.
 21. No information was invented.
 
 ---
@@ -1302,7 +1270,7 @@ Do not return:
 The only top-level properties are:
 
 ```text
-maxNumOfGroups
+numOfAllGroupsExistingInTable
 changesFromAtoB
 ```
 

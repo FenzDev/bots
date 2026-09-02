@@ -17,7 +17,7 @@ const timetableSessionSchema = z.object({
   day:z.string().optional(),
 });
 const timetableCheckAIResultSchema = z.object({
-  maxNumOfGroups: z.number(),
+  numOfAllGroupsExistingInTable: z.number(),
   changesFromAtoB: z.array(
     z.object({
       groupsInvolved: z.array(
