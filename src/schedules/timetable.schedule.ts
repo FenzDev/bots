@@ -71,14 +71,13 @@ let timetableCheckRunning = false;
 cron.schedule(
   TIMETABLE_CHECK_SCHEDULE,
   async () => {
+    if (timetableCheckRunning) {
+      logger.warn(
+        "New timetable check schedule was interrupted because one is still running.",
+      );
+      return;
+    }
     try {
-      if (timetableCheckRunning) {
-        logger.warn(
-          "New timetable check schedule was interrupted because one is still running.",
-        );
-        return;
-      }
-
       timetableCheckRunning = true;
 
       if (debugMode) {
@@ -205,7 +204,7 @@ cron.schedule(
           }
 
           for (let step = 0; step < 3; step++) {
-            logger.debug("Running AI checker ™.");
+            logger.debug("Running AI checker.");
             const aiResult = await runAIApp(
               timetableAIApp,
               {
@@ -245,14 +244,14 @@ cron.schedule(
 
         while ((update = updatedTimetables.shift())) {
           if (!update.aiResponse) {
-            logger.debug("AI decided to discard change.");
+            logger.debug("AI decided to discard change broadcast.");
             continue;
           }
 
           logger.debug("Broadcasting the update");
 
           const pdfUrl = `https://t.me/${TELEGRAM_TIMETABLEBOT_USERNAME}?start=${update.section.name}`;
-          const sourceUrl = `${baseUrl}/edit?gid=${update.section.timetableGID}`;
+          const sourceUrl = `${baseUrl}/edit?gid=${update.section.timetableGID}#gid=${update.section.timetableGID}`;
 
           await chillBot.api.sendMessage(
             update.section.timetableBroadcastChatId!,
@@ -262,9 +261,11 @@ cron.schedule(
 
 ${aiResultToString(update.section, update.aiResponse)}
 
-[📄pdf](${pdfUrl}) [🔗source](${sourceUrl})`.trim().replace(/([_~`#+\-=|{}.!\\])/g, '\\$1'),
+[📄pdf](${pdfUrl}) [🔗source](${sourceUrl})`
+              .trim()
+              .replace(/([_~`#+\-=|{}.!\\])/g, "\\$1"),
             {
-              parse_mode: "Markdown",
+              parse_mode: "MarkdownV2",
               message_thread_id:
                 update.section.timetableBroadcastThreadId ?? undefined,
             },
@@ -286,21 +287,57 @@ function aiResultToString(
   section: StudySection,
   aiResponse: TimetableCheckAIResult,
 ) {
+  logger.debug({ aiResponse, section }, "generating ai result string");
   return aiResponse.changesFromAtoB
     .map((change) => {
+      if (!change?.from && !change?.to)
+        throw new Error(
+          "in one of the elements of changeFromAtoB, from and to are both null.",
+        );
+
       const groups =
         change.groupsInvolved.includes("ALL") ||
         aiResponse.maxNumOfGroups === change.groupsInvolved.length
-          ? `#section #${section.displayShort?.trim().toUpperCase().replaceAll(" ", "_")}`
-          : change.groupsInvolved.map((g) => `#${g}`).join(" ");
+          ? `#section #${section.displayShort?.trim().toLowerCase().replaceAll(" ", "_")}`
+          : change.groupsInvolved.map((g) => `#${g.toLowerCase()}`).join(" ");
 
-      const sessionTitle = `#${change.sessionTitleInvolved.trim().toUpperCase()}`;
+      const sessionTitle = `${
+        change.sessionType === "LECTURE"
+          ? "Cours "
+          : change.sessionType === "TUTORIAL"
+            ? "TD "
+            : change.sessionType === "LAB"
+              ? "TP "
+              : ""
+      }${change.subjectTitle.trim().toUpperCase()}`;
 
       let content;
       if (!change.from) {
+        content = change.to!.teacher
+          ? `➕👨‍🏫 **${change.to!.teacher}\n**`
+          : "" + change.to!.classroom
+            ? `➕📍 **${change.to!.teacher}\n**`
+            : "" + change.to!.day && change.to!.startTime
+              ? `➕🕑 **${change.to!.day} ${change.to!.startTime}**\n`
+              : change.to!.startTime
+                ? `➕🕑 **${change.to!.startTime}**\n`
+                : "" + change.to!.day
+                  ? `➕🕑 **${change.to!.day}**\n`
+                  : "";
       } else if (!change.to) {
+        content = change.from!.teacher
+          ? `➖👨‍🏫 **${change.from!.teacher}\n**`
+          : "" + change.from!.classroom
+            ? `➖📍 **${change.from!.teacher}\n**`
+            : "" + change.from!.day && change.from!.startTime
+              ? `➖🕑 **${change.from!.day} ${change.from!.startTime}**\n`
+              : change.from!.startTime
+                ? `➖🕑 **${change.from!.startTime}**\n`
+                : "" + change.from!.day
+                  ? `➖🕑 **${change.from!.day}**\n`
+                  : "";
       } else {
-        const content =
+        content =
           change.changeTarget === "TEACHER"
             ? `👨‍🏫 **${change.from.teacher} ➜ ${change.to.teacher}**`
             : change.changeTarget === "CLASSROOM"
@@ -309,10 +346,10 @@ function aiResultToString(
                 ? `🕑 **${change.from.day} ${change.from.startTime} ➜ ${change.to.day} ${change.to.startTime}**`
                 : change.changeTarget === "TIME"
                   ? `🕑 **${change.from.startTime} ➜ ${change.to.startTime}**`
-                  : "${}";
+                  : "";
       }
 
       return `> 🔴 ${sessionTitle} ${groups}\n> ${content}`;
     })
-    .join("\n");
+    .join("\n\n");
 }

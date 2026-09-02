@@ -1,501 +1,554 @@
 # Timetable Comparison
 
-Compare **Table A (old)** and **Table B (new)** and identify all **meaningful changes** between them.
+Compare **Table A (old)** and **Table B (new)** and identify all **meaningful timetable changes**.
 
-Return the result **strictly according to the provided schema**. Do not return explanations, comments, markdown, or any fields that are not defined by the schema.
+Return the result **strictly according to the provided schema**. Do not return explanations, comments, markdown, reasoning, or fields that are not defined by the schema.
 
-Timetables may be **badly designed, inconsistent, incomplete, or completely different in structure**. Do not assume a standard timetable layout, row/column arrangement, cell format, or that every session contains all information.
+The timetables may be badly designed, inconsistent, incomplete, differently structured, or partially unreadable. Do not assume a fixed row/column layout or that every session contains all information.
 
 ---
 
-## Core Principle
+# 1. Output Schema
 
-**Do not compare cells directly. Match logical sessions first, then determine what changed.**
+The result must contain exactly:
 
-A session that appears in both tables should be treated as the **same logical session** whenever the available evidence strongly indicates that it is the same session, even if:
+```text
+{
+  "maxNumOfGroups": number,
+  "changesFromAtoB": [
+    {
+      "groupsInvolved": ["ALL" | "G1" | ... | "G10"],
+      "subjectTitle": string,
+      "sessionType": "LECTURE" | "TUTORIAL" | "LAB" | "NONE",
+      "changeTarget": "WHOLE_SESSION" | "TIME" | "DAY+TIME" | "CLASSROOM" | "TEACHER" | null,
+      "from": {
+        "teacher"?: string,
+        "classroom"?: string,
+        "startTime"?: string,
+        "day"?: string
+      } | null,
+      "to": {
+        "teacher"?: string,
+        "classroom"?: string,
+        "startTime"?: string,
+        "day"?: string
+      } | null
+    }
+  ]
+}
+```
 
-* Its position changed
-* Its day changed
-* Its time changed
-* Its classroom changed
-* Its teacher changed
-* The table structure changed
-* The session is represented differently between the two tables
+Do not output any additional properties.
 
-A change in one of these properties does **not automatically mean that the old session was removed and a new session was added**.
+`from` and `to` may contain **only**:
+
+```text
+teacher
+classroom
+startTime
+day
+```
+
+---
+
+# 2. Main Principle
+
+**Match logical sessions first. Detect changes second.**
+
+Never compare timetable cells only by their position.
+
+A session that appears in both tables is normally the **same logical session** when the available evidence indicates that it represents the same subject/session.
+
+A session remains the same logical session even if:
+
+* its position changed;
+* its day changed;
+* its time changed;
+* its classroom changed;
+* its teacher changed;
+* the timetable structure changed;
+* some information is missing;
+* the formatting changed.
+
+For example:
+
+Table A:
+
+```text
+Wednesday
+12H45
+
+Lecture : ASD 1
+Chettat
+158/3
+```
+
+Table B:
+
+```text
+Tuesday
+09H35
+
+Lecture : ASD 1
+Chettat
+158/3
+```
+
+This is **one session that moved**.
+
+Return one change:
+
+```text
+{
+  "groupsInvolved": [...],
+  "subjectTitle": "ASD 1",
+  "sessionType": "LECTURE",
+  "changeTarget": "DAY+TIME",
+  "from": {
+    "day": "Wednesday",
+    "startTime": "12H45"
+  },
+  "to": {
+    "day": "Tuesday",
+    "startTime": "09H35"
+  }
+}
+```
+
+Do **not** report it as one removal plus one addition.
+
+---
+
+# 3. Understand Both Timetables First
+
+Before comparing the tables, determine how each timetable represents:
+
+* days;
+* times;
+* groups;
+* subjects;
+* session types;
+* teachers;
+* classrooms.
+
+A timetable may use:
+
+* days as rows;
+* days as columns;
+* groups as rows;
+* groups as columns;
+* times as rows;
+* times as columns;
+* sessions inside cells;
+* merged cells;
+* repeated values;
+* multiple sections;
+* headers;
+* notes;
+* different structures in A and B;
+* incomplete information.
+
+Do not assume that a specific row, column, or coordinate represents a particular field.
+
+Infer meaning from the actual contents and surrounding context.
+
+---
+
+# 4. Identify Logical Sessions
+
+A logical session can contain some or all of:
+
+* subject;
+* session type;
+* groups;
+* teacher;
+* classroom;
+* day;
+* start time.
+
+Examples:
+
+```text
+Lecture : ASD 1
+Chettat
+158/3
+```
+
+```text
+Tutorial : ASD 1
+Chettat
+```
+
+```text
+LAB : Programming
+Boudiaf
+```
+
+```text
+ASD 1
+```
+
+```text
+ASD 1 — 158/3
+```
+
+Missing information is allowed.
+
+Do not require every field before attempting to identify or match a session.
+
+**Never invent missing information.**
+
+---
+
+# 5. `subjectTitle`
+
+`subjectTitle` must contain the **subject name only**.
+
+Do **not** include the session type in `subjectTitle`.
 
 For example:
 
 ```text
-Table A:
-
-Wednesday / G1,G2,G3 / 12H45
-
-Lecture : IA
-Chettat
-158/3
+Lecture : ASD 1
 ```
+
+must produce:
 
 ```text
-Table B:
-
-Tuesday / G1,G2,G3 / 09H35
-
-Lecture : IA
-Chettat
-158/3
+subjectTitle: "ASD 1"
+sessionType: "LECTURE"
 ```
 
-This is **one logical session that moved**, not an addition and a removal.
-
-The correct result is one change:
+NOT:
 
 ```text
-groupsInvolved: ["G1", "G2", "G3"]
-
-sessionTitleInvolved: "Lecture : IA"
-
-changeTarget: "DAY+TIME"
-
-from: {
-  day: "Wednesday",
-  startTime: "12H45"
-}
-
-to: {
-  day: "Tuesday",
-  startTime: "09H35"
-}
+subjectTitle: "Lecture : ASD 1"
 ```
-
----
-
-# 1. Understand the Timetable First
-
-Before comparing Table A and Table B, determine the logical meaning of each timetable from its actual contents.
-
-A timetable may have:
-
-* Days as rows
-* Days as columns
-* Groups as rows
-* Groups as columns
-* Times as rows
-* Times as columns
-* Sessions represented inside cells
-* Sessions spanning multiple cells
-* Merged cells
-* Repeated values caused by merged cells
-* Extra headers
-* Titles
-* Notes
-* Multiple sections
-* Different structures between A and B
-* Missing information
-* Inconsistent formatting
-* Empty cells
-* Partial session information
-
-**Never assume that a particular row, column, or position represents a particular field.**
-
-Infer the meaning from the actual timetable contents and surrounding context.
-
-Do not compare the tables purely by their coordinates.
-
----
-
-# 2. Identify Logical Sessions
-
-A logical session may contain some or all of:
-
-* Session type/title
-* Subject
-* Groups
-* Teacher
-* Classroom
-* Day
-* Start time
-
-A cell may contain information such as:
-
-```text
-Lecture : IA
-Chettat
-158/3
-```
-
-or:
-
-```text
-Tutorial : IA
-Chettat
-```
-
-or simply:
-
-```text
-IA
-```
-
-or:
-
-```text
-IA — 158/3
-```
-
-Do not require every field to exist.
-
-The absence of a field does not mean that the session is a different session.
-
----
-
-# 3. `sessionTitleInvolved`
-
-`sessionTitleInvolved` identifies the **full session title/label**, not merely the subject name.
-
-In most timetable cells, the **first line is the primary session title/identifier**.
-
-For example, if a cell contains:
-
-```text
-Lecture : IA
-Chettat
-158/3
-```
-
-then:
-
-```text
-sessionTitleInvolved: "Lecture : IA"
-```
-
-**Do not reduce this to `"IA"`**.
 
 Likewise:
 
 ```text
-Tutorial : IA
-Chettat
-158/3
+Tutorial : ASD 1
 ```
 
-must use:
+must produce:
 
 ```text
-sessionTitleInvolved: "Tutorial : IA"
+subjectTitle: "ASD 1"
+sessionType: "TUTORIAL"
 ```
 
-The session type is part of the session identity.
-
-Therefore:
+And:
 
 ```text
-Lecture : IA
+LAB : Programming
+```
+
+must produce:
+
+```text
+subjectTitle: "Programming"
+sessionType: "LAB"
+```
+
+The session type and subject are **separate fields**.
+
+Remove only the session-type indicator from the subject.
+
+For example:
+
+```text
+Lecture: Database Management System
+```
+
+means:
+
+```text
+subjectTitle: "Database Management System"
+sessionType: "LECTURE"
+```
+
+Do not unnecessarily modify the subject's actual name.
+
+---
+
+# 6. Detecting the Session Type
+
+Map timetable terminology to exactly one of:
+
+```text
+LECTURE
+TUTORIAL
+LAB
+NONE
+```
+
+Common indicators include:
+
+### Lecture
+
+Examples:
+
+```text
+Lecture : ASD
+LECTURE : ASD
+Cours : ASD
+Cours ASD
+ASD
+```
+
+Use `LECTURE` when the timetable explicitly indicates a lecture/course.
+
+**Important:** The word `lecture` is not required.
+
+French or other equivalent terminology such as:
+
+```text
+cours
+```
+
+can indicate a lecture.
+
+Also infer `LECTURE` when the timetable clearly represents the subject as a lecture through context, even if the word "lecture" is not written.
+
+For example, if:
+
+* all existing groups have the subject at the same time;
+* the subject is presented as a shared session for all groups;
+* the timetable structure clearly identifies it as the common course/lecture;
+
+then this can be evidence for `LECTURE`.
+
+Do not require the literal word `lecture`.
+
+### Tutorial
+
+Examples:
+
+```text
+Tutorial : ASD
+TD : ASD
+TD ASD
+```
+
+Use:
+
+```text
+sessionType: "TUTORIAL"
+```
+
+when the timetable clearly identifies a tutorial/TD session.
+
+### Lab
+
+Examples:
+
+```text
+Lab : Programming
+LAB : Programming
+TP : Programming
+TP Programming
+```
+
+Use:
+
+```text
+sessionType: "LAB"
+```
+
+when the timetable clearly identifies a practical/lab/TP session.
+
+### None
+
+Use:
+
+```text
+sessionType: "NONE"
+```
+
+when the timetable does not provide enough reliable evidence to classify the session as lecture, tutorial, or lab.
+
+**Do not guess a session type merely because a subject exists.**
+
+---
+
+# 7. Session Type Is Important for Matching
+
+Use session type as an important matching signal.
+
+For example:
+
+```text
+Lecture : ASD
 ```
 
 and:
 
 ```text
-Tutorial : IA
+Tutorial : ASD
 ```
 
-should normally be treated as **different logical sessions**, even though both contain the subject `IA`.
+are normally **different logical sessions**.
 
-Other examples:
+Do not match them merely because the subject is the same.
 
-```text
-Lecture : Database Management System
-```
-
-```text
-Tutorial : DBMS
-```
-
-```text
-TP : Algorithm 1
-```
-
-The complete first-line label should be preserved.
-
-If the timetable uses a different structure, identify the first line or equivalent text that most clearly identifies the logical session.
-
-Do not unnecessarily shorten or reconstruct it.
-
----
-
-# 4. Match Sessions Before Detecting Changes
-
-Try to match sessions between Table A and Table B using **all available evidence**.
-
-Useful evidence includes:
-
-* Full session title
-* Session type
-* Subject
-* Groups
-* Teacher
-* Classroom
-* Day
-* Start time
-* Relative position
-* Surrounding sessions
-* Repeated timetable patterns
-* Other contextual information
-
-Use the **combination of evidence**, not a single field.
-
-### Important rules
-
-A change of day/time does **not** mean the session is new.
-
-A change of classroom does **not** mean the session is new.
-
-A change of teacher does **not** mean the session is new.
-
-A change of position in the table does **not** mean the session is new.
-
-If enough identifying information matches, treat the sessions as the same logical session and report only the changed fields.
+However, superficial textual differences do not necessarily indicate a different session.
 
 For example:
 
 ```text
-Table A:
-
-Lecture : IA
-Chettat
-158/3
+Lecture : ASD
 ```
+
+and:
 
 ```text
-Table B:
-
-Lecture : IA
-Boudiaf
-158/3
+Cours : ASD
 ```
 
-This is a teacher change, not a removal and addition.
+may represent the same lecture.
 
-Similarly:
+Likewise:
 
 ```text
-Table A:
-
-Lecture : IA
-Chettat
-158/3
+TP : Programming
 ```
+
+and:
 
 ```text
-Table B:
-
-Lecture : IA
-Chettat
-204
+Lab : Programming
 ```
 
-is a classroom change.
+may represent the same lab when the context confirms this.
 
 ---
 
-# 5. Session Matching and Subject Names
+# 8. Match Sessions Using All Available Evidence
 
-Subject names may be represented differently.
+When matching a session from Table A to Table B, consider the combination of:
 
-Treat obvious full-name/acronym equivalents as the same subject when the surrounding context clearly confirms that they refer to the same session.
+* subject;
+* session type;
+* groups;
+* teacher;
+* classroom;
+* day;
+* start time;
+* surrounding sessions;
+* relative timetable structure;
+* repeated patterns;
+* other contextual information.
+
+Do not rely on only one field when the evidence is ambiguous.
+
+Strong evidence includes:
+
+* same subject;
+* same session type;
+* same groups;
+* same surrounding timetable context;
+* same teacher/classroom;
+* same position relative to other sessions.
+
+A changed day, time, teacher, or classroom does **not** automatically mean the session is new.
+
+---
+
+# 9. Subject Name Variations
+
+Subject names may appear as:
+
+* abbreviations;
+* acronyms;
+* full names;
+* minor spelling variations;
+* different punctuation;
+* different capitalization.
+
+Treat obvious equivalents as the same subject when context confirms it.
 
 Examples:
 
 ```text
 Artificial Intelligence
-```
-
-and:
-
-```text
 AI
 ```
 
-may represent the same subject.
-
-Likewise:
+may be the same subject.
 
 ```text
 Database Management System
-```
-
-and:
-
-```text
 DBMS
 ```
 
-may represent the same subject.
-
-And:
+may be the same subject.
 
 ```text
 Algorithm 1
-```
-
-and:
-
-```text
 Algo1
 ```
 
-may represent the same subject.
+may be the same subject.
 
-However, **do not ignore the session type**.
+Do not assume unrelated names are equivalent.
+
+When matching is uncertain, use the strongest available evidence and do not invent a relationship.
+
+---
+
+# 10. Ignore Superficial Differences
+
+Do not report changes caused only by:
+
+* capitalization;
+* whitespace;
+* line breaks;
+* punctuation;
+* commas;
+* HTML formatting;
+* Markdown formatting;
+* quotation marks;
+* minor spelling mistakes;
+* equivalent abbreviations;
+* equivalent session-type wording;
+* other purely formatting differences.
 
 For example:
 
 ```text
-Lecture : IA
+Lecture : ASD
 ```
 
 and:
 
 ```text
-Tutorial : IA
+LECTURE: ASD
 ```
 
-should not be considered the same merely because both contain `IA`.
-
-The complete session title, especially the first-line label, is an important matching signal.
-
----
-
-# 6. Handle Incomplete Sessions
-
-Incomplete sessions are valid.
-
-Examples:
-
-```text
-IA
-```
-
-```text
-IA
-Chettat
-```
-
-```text
-IA
-158/3
-```
-
-```text
-Lecture : IA
-Chettat
-```
-
-Do not require every session to have:
-
-* Teacher
-* Classroom
-* Day
-* Time
-* Groups
-
-before attempting to match it.
-
-Use whatever information is available.
-
-**Never invent missing information.**
-
-If a field is absent, leave it absent.
-
----
-
-# 7. Ignore Superficial Differences
-
-Do not report a change when the difference is only superficial.
-
-Ignore differences caused only by:
-
-* Case
-* Whitespace
-* Line breaks
-* Punctuation
-* Commas
-* HTML formatting
-* Markdown formatting
-* Quoting
-* Minor spelling mistakes
-* Equivalent formatting
-* Other meaningless textual differences
-
-For example:
-
-```text
-Lecture : IA
-```
-
-and:
-
-```text
-LECTURE : IA
-```
-
-should normally be considered the same session.
+are normally the same session.
 
 Likewise:
 
 ```text
-Lecture : IA
+Cours : ASD
 ```
 
 and:
 
 ```text
-Lecture: IA
+Lecture : ASD
 ```
 
-should normally be considered the same session.
-
-Do not report formatting differences as timetable changes.
+may be the same lecture when the context confirms it.
 
 ---
 
-# 8. Groups
+# 11. Groups
 
-Determine which timetable groups are logically affected by each session.
+Determine which groups are affected by each logical change.
 
-If the same logical session applies to multiple groups and the same change affects all of them, create **one change** containing all affected groups.
-
-For example:
-
-```text
-groupsInvolved: ["G1", "G2", "G3"]
-```
-
-Do not create:
-
-```text
-G1 → change
-G2 → change
-G3 → change
-```
-
-when these are actually one shared logical session.
-
-Instead create one change:
-
-```text
-groupsInvolved: ["G1", "G2", "G3"]
-```
-
-Do not duplicate changes merely because the same session appears in multiple cells due to merged cells or timetable layout.
-
-If every relevant timetable group is affected, use:
-
-```text
-groupsInvolved: ["ALL"]
-```
-
-Only these group values are allowed:
+Allowed values are only:
 
 ```text
 ALL
@@ -511,39 +564,92 @@ G9
 G10
 ```
 
-Never invent other group names.
+If the same logical session is shared by several groups and the same change affects all of them, return **one change** containing all groups.
 
-If the group cannot be determined reliably, do not invent one.
-
----
-
-# 9. Merged Cells and Repeated Information
-
-A timetable may visually repeat the same session because of:
-
-* Merged cells
-* Shared sessions
-* Group spans
-* Formatting
-* Repeated labels
-
-Do not interpret repeated representations as multiple logical sessions when the context indicates that they are the same session.
-
-For example, if one session spans G1, G2, and G3 and appears in multiple cells, treat it as one logical session affecting:
+Example:
 
 ```text
-["G1", "G2", "G3"]
+groupsInvolved: ["G1", "G2", "G3"]
 ```
 
-Do not report three separate changes.
+Do not return three separate changes.
+
+If every relevant timetable group is affected, use:
+
+```text
+groupsInvolved: ["ALL"]
+```
+
+Do not use `ALL` together with individual groups.
+
+For example, do not return:
+
+```text
+["ALL", "G1"]
+```
+
+If the affected group cannot be determined reliably, do not invent a group.
 
 ---
 
-# 10. Determine the Smallest Meaningful Change
+# 12. Detecting `ALL`
 
-Once a session has been matched between Table A and Table B, identify **only the fields that actually changed**.
+Use:
 
-Use only these `changeTarget` values:
+```text
+groupsInvolved: ["ALL"]
+```
+
+when the evidence shows that the logical session affects all relevant timetable groups.
+
+Do not interpret `ALL` as literally one group.
+
+For example, if the timetable contains:
+
+```text
+G1
+G2
+G3
+G4
+G5
+G6
+```
+
+and the session is shared by all of them:
+
+```text
+groupsInvolved: ["ALL"]
+```
+
+represents 6 groups.
+
+---
+
+# 13. Merged Cells and Repeated Sessions
+
+A session may appear multiple times because of:
+
+* merged cells;
+* shared groups;
+* repeated labels;
+* visual formatting;
+* duplicated timetable information.
+
+Do not treat repeated representations as separate logical sessions when the context indicates that they are the same session.
+
+For example, if one lecture applies to G1, G2, and G3 and is visually repeated across their timetable cells, return:
+
+```text
+groupsInvolved: ["G1", "G2", "G3"]
+```
+
+not three separate changes.
+
+---
+
+# 14. Determine the Smallest Meaningful Change
+
+Allowed `changeTarget` values are:
 
 ```text
 WHOLE_SESSION
@@ -553,156 +659,134 @@ CLASSROOM
 TEACHER
 ```
 
-Do not use any other value.
+or `null`.
+
+Use the most specific target possible.
 
 ### `TIME`
 
-Use `TIME` when **only the start time changed**.
+Use when **only the start time changed**.
 
 Example:
 
 ```text
 from: {
-  startTime: "12H45"
+  "startTime": "12H45"
 }
-
 to: {
-  startTime: "09H35"
+  "startTime": "09H35"
 }
 ```
 
 ### `DAY+TIME`
 
-Use `DAY+TIME` whenever the **day changes**, whether or not the time also changes.
+Use whenever the **day changed**.
 
-This includes a day-only change because the schema has no standalone `DAY` target.
+This includes:
 
-Day-only example:
+* day only;
+* day + time.
 
-```text
-from: {
-  day: "Wednesday"
-}
-
-to: {
-  day: "Tuesday"
-}
-```
-
-Day and time change:
+Day only:
 
 ```text
 from: {
-  day: "Wednesday",
-  startTime: "12H45"
+  "day": "Wednesday"
 }
-
 to: {
-  day: "Tuesday",
-  startTime: "09H35"
+  "day": "Tuesday"
 }
 ```
+
+Day + time:
+
+```text
+from: {
+  "day": "Wednesday",
+  "startTime": "12H45"
+}
+to: {
+  "day": "Tuesday",
+  "startTime": "09H35"
+}
+```
+
+There is no standalone `DAY` target.
 
 ### `CLASSROOM`
 
-Use `CLASSROOM` when only the classroom changed.
+Use when only the classroom changed.
 
 ```text
 from: {
-  classroom: "158/3"
+  "classroom": "158/3"
 }
-
 to: {
-  classroom: "204"
+  "classroom": "204"
 }
 ```
 
 ### `TEACHER`
 
-Use `TEACHER` when only the teacher changed.
+Use when only the teacher changed.
 
 ```text
 from: {
-  teacher: "Chettat"
+  "teacher": "Chettat"
 }
-
 to: {
-  teacher: "Boudiaf"
+  "teacher": "Boudiaf"
 }
 ```
 
 ### `WHOLE_SESSION`
 
-Use `WHOLE_SESSION` only when:
+Use when:
 
-* A session was added
-* A session was removed
-* A session was replaced
-* The change cannot reasonably be represented using `TIME`, `DAY+TIME`, `CLASSROOM`, or `TEACHER`
+* a session was added;
+* a session was removed;
+* a session was replaced;
+* the session identity itself changed;
+* multiple changed properties cannot be represented by one specific target.
 
-**Do not use `WHOLE_SESSION` merely because a session has multiple changed properties.**
-
-For example, if teacher and classroom both changed but the logical session is clearly the same, use `WHOLE_SESSION` only if the schema cannot represent that combination more specifically.
+Do **not** use `WHOLE_SESSION` merely because a session has multiple changes.
 
 ---
 
-# 11. Multiple Fields Changed
+# 15. Multiple Properties Changed
 
-The schema provides individual targets for:
+Each logical session should normally produce **one change object**.
 
-* `TIME`
-* `DAY+TIME`
-* `CLASSROOM`
-* `TEACHER`
-* `WHOLE_SESSION`
+Do not create multiple changes for the same session.
 
-When a matched session has changes that cannot be represented by a single specific target, use `WHOLE_SESSION`.
-
-Do not create multiple changes for the same logical session merely because multiple fields changed.
-
-For example, if a session changes both teacher and classroom, do not create:
+For example, if the teacher and classroom both changed:
 
 ```text
-TEACHER
+from: {
+  "teacher": "Chettat",
+  "classroom": "158/3"
+}
+to: {
+  "teacher": "Boudiaf",
+  "classroom": "204"
+}
 ```
 
-and:
-
-```text
-CLASSROOM
-```
-
-as two separate changes.
-
-Create one change for that logical session and use:
+use:
 
 ```text
 changeTarget: "WHOLE_SESSION"
 ```
 
-with only the changed fields in `from` and `to`.
+Do not create separate `TEACHER` and `CLASSROOM` changes.
 
-Example:
-
-```text
-from: {
-  teacher: "Chettat",
-  classroom: "158/3"
-}
-
-to: {
-  teacher: "Boudiaf",
-  classroom: "204"
-}
-```
-
-The same principle applies whenever multiple changed properties cannot be represented by one of the specific targets.
+Similarly, if several properties changed and no single specific target represents the complete change, use `WHOLE_SESSION`.
 
 ---
 
-# 12. `from` and `to`
+# 16. `from` and `to`
 
-`from` and `to` may only contain these fields:
+`from` and `to` may contain only:
 
 ```text
 teacher
@@ -711,45 +795,36 @@ startTime
 day
 ```
 
-Do not put `sessionTitleInvolved` inside `from` or `to`.
+For a modification, include **only fields that actually changed**.
 
-Do not put `groupsInvolved` inside `from` or `to`.
+If the teacher did not change, do not include `teacher`.
 
-Do not put any other fields inside `from` or `to`.
+If the classroom did not change, do not include `classroom`.
 
-### For modifications
+If the day did not change, do not include `day`.
 
-**Only include fields that actually changed.**
-
-If the teacher stayed the same, do not include `teacher`.
-
-If the classroom stayed the same, do not include `classroom`.
-
-If the day stayed the same, do not include `day`.
-
-If the time stayed the same, do not include `startTime`.
+If the start time did not change, do not include `startTime`.
 
 Example:
 
 ```text
 from: {
-  day: "Wednesday",
-  startTime: "12H45"
+  "day": "Wednesday",
+  "startTime": "12H45"
 }
-
 to: {
-  day: "Tuesday",
-  startTime: "09H35"
+  "day": "Tuesday",
+  "startTime": "09H35"
 }
 ```
 
-Do not add the unchanged teacher or classroom.
+Do not include unchanged teacher/classroom information.
 
 ---
 
-# 13. Additions
+# 17. Additions
 
-A session is an addition **only when there is no credible matching logical session in Table A**.
+A session is an addition only when there is **no credible matching logical session in Table A**.
 
 For an addition:
 
@@ -765,28 +840,29 @@ to: {
 }
 ```
 
-The `to` object should contain the available information about the newly added session:
+Include the available information about the new session:
 
 ```text
 from: null
-
 to: {
-  teacher: "Chettat",
-  classroom: "158/3",
-  startTime: "09H35",
-  day: "Tuesday"
+  "teacher": "Chettat",
+  "classroom": "158/3",
+  "startTime": "09H35",
+  "day": "Tuesday"
 }
 ```
 
-Do not invent fields that are not present.
+Only include information actually present.
 
-An addition should not be reported if the session already existed in Table A but merely moved or changed some properties.
+Do not invent missing fields.
+
+A session that existed in A but moved, changed teacher, changed classroom, changed time, or changed day is **not an addition**.
 
 ---
 
-# 14. Removals
+# 18. Removals
 
-A session is a removal **only when there is no credible matching logical session in Table B**.
+A session is a removal only when there is **no credible matching logical session in Table B**.
 
 For a removal:
 
@@ -794,133 +870,84 @@ For a removal:
 from: {
   ...
 }
-
 to: null
 ```
+
+Include only available information.
 
 Example:
 
 ```text
 from: {
-  teacher: "Chettat",
-  classroom: "158/3",
-  startTime: "12H45",
-  day: "Wednesday"
+  "teacher": "Chettat",
+  "classroom": "158/3",
+  "startTime": "12H45",
+  "day": "Wednesday"
 }
-
 to: null
 ```
 
-Do not report a removal if the session was simply moved, renamed slightly, or changed teacher/classroom/time/day.
+Do not report a removal if the session was simply:
+
+* moved;
+* rescheduled;
+* changed teacher;
+* changed classroom;
+* represented differently;
+* renamed slightly;
+* reformatted.
 
 ---
 
-# 15. Do Not Turn Moves Into Additions + Removals
+# 19. Never Turn a Move Into an Addition + Removal
 
-This is one of the most important rules.
+This is a critical rule.
 
-If a session can reasonably be matched between A and B, it is the **same logical session**.
+If the same logical session can reasonably be matched between A and B, it is **one session**, even when its location in the timetable changed completely.
 
-For example:
+Example:
 
-```text
 Table A:
 
+```text
 Wednesday
 12H45
-Lecture : IA
+Lecture : ASD 1
 Chettat
 158/3
 ```
 
-```text
 Table B:
 
+```text
 Tuesday
 09H35
-Lecture : IA
+Lecture : ASD 1
 Chettat
 158/3
 ```
 
-Do **not** return:
-
-```text
-Removal of Lecture : IA
-+
-Addition of Lecture : IA
-```
-
-Return one change:
+Correct:
 
 ```text
 changeTarget: "DAY+TIME"
 ```
 
-with:
+Incorrect:
 
 ```text
-from: {
-  day: "Wednesday",
-  startTime: "12H45"
-}
-
-to: {
-  day: "Tuesday",
-  startTime: "09H35"
-}
+Removal
++
+Addition
 ```
+
+Always attempt logical session matching before classifying additions or removals.
 
 ---
 
-# 16. Ambiguous Matching
+# 20. Slight Session Name Changes
 
-Do not invent relationships between sessions.
-
-Use the strongest combination of evidence available.
-
-Strong evidence can include:
-
-* Same complete session title
-* Same session type
-* Same subject
-* Same groups
-* Same teacher
-* Same classroom
-* Same surrounding sessions
-* Same timetable pattern
-
-Weak evidence includes only one common attribute.
-
-For example, two sessions both named:
-
-```text
-IA
-```
-
-are not necessarily the same if one is:
-
-```text
-Lecture : IA
-```
-
-and the other is:
-
-```text
-Tutorial : IA
-```
-
-Likewise, two sessions having the same teacher alone does not establish that they are the same session.
-
-When matching is uncertain, do not invent a match.
-
-Only match sessions when the combined evidence provides a credible relationship.
-
----
-
-# 17. Session Titles That Change Slightly
-
-Do not report a session as added/removed merely because its textual representation changed slightly.
+Do not automatically classify a session as added/removed because its textual representation changed.
 
 For example:
 
@@ -934,71 +961,154 @@ and:
 Lecture : AI
 ```
 
-may be the same logical session if the context confirms it.
+may be the same session.
 
-Similarly:
+Likewise:
 
 ```text
-Lecture: IA
+Lecture : ASD 1
 ```
 
 and:
 
 ```text
-Lecture : IA
+Cours : ASD 1
 ```
 
-are the same session.
+may be the same session.
 
-However, preserve the appropriate full session title in `sessionTitleInvolved`.
-
-The session title should generally be the **first-line session label**, including the session type.
-
-Do not reduce:
+Likewise:
 
 ```text
-Lecture : IA
+TP : Programming
 ```
 
-to:
+and:
 
 ```text
-IA
+Lab : Programming
+```
+
+may be the same session.
+
+Use contextual evidence to decide.
+
+If the logical session is clearly the same, report only its meaningful timetable changes.
+
+---
+
+# 21. Subject Title Must Not Contain Session Type
+
+This rule is especially important.
+
+Always separate the session type from the subject.
+
+Examples:
+
+```text
+Lecture : ASD 1
+```
+
+→
+
+```text
+subjectTitle: "ASD 1"
+sessionType: "LECTURE"
+```
+
+```text
+Cours : ASD 1
+```
+
+→
+
+```text
+subjectTitle: "ASD 1"
+sessionType: "LECTURE"
+```
+
+```text
+TD : ASD 1
+```
+
+→
+
+```text
+subjectTitle: "ASD 1"
+sessionType: "TUTORIAL"
+```
+
+```text
+TP : ASD 1
+```
+
+→
+
+```text
+subjectTitle: "ASD 1"
+sessionType: "LAB"
+```
+
+Never produce:
+
+```text
+subjectTitle: "Lecture : ASD 1"
+```
+
+or:
+
+```text
+subjectTitle: "TD : ASD 1"
+```
+
+The type belongs exclusively in `sessionType`.
+
+---
+
+# 22. Session Type May Be Implicit
+
+Do not depend exclusively on explicit words such as:
+
+```text
+lecture
+cours
+tutorial
+TD
+lab
+TP
+```
+
+The timetable may communicate the type indirectly.
+
+Use contextual evidence when available.
+
+For example, if:
+
+* all relevant groups share the subject at exactly the same time;
+* the timetable's organization clearly identifies shared courses;
+* surrounding headers or labels indicate that the session is a course/lecture;
+
+then infer:
+
+```text
+sessionType: "LECTURE"
+```
+
+when this is strongly supported.
+
+Do not over-infer.
+
+If the evidence is insufficient, use:
+
+```text
+sessionType: "NONE"
 ```
 
 ---
 
-# 18. Changes to Session Titles
+# 23. `maxNumOfGroups`
 
-A session title may itself change.
-
-Do not automatically interpret every title difference as a new session.
-
-First determine whether the title difference is:
-
-* Formatting only
-* Case only
-* Punctuation only
-* Whitespace only
-* Acronym/full-name equivalent
-* Minor spelling variation
-* Or an actual different session
-
-If the evidence strongly indicates that the logical session is the same, match it and report only the meaningful changed fields.
-
-If the actual session identity changed and cannot be represented by the available specific targets, use:
-
-```text
-changeTarget: "WHOLE_SESSION"
-```
-
-Never invent a new `changeTarget` for title changes.
-
----
-
-# 19. `maxNumOfGroups`
-
-`maxNumOfGroups` must represent the **largest number of timetable groups affected by any single logical change**.
+`maxNumOfGroups` is the **largest number of actual timetable groups affected by any single logical change**.
 
 Examples:
 
@@ -1012,7 +1122,7 @@ means:
 maxNumOfGroups: 3
 ```
 
-If the largest change affects:
+If the largest affected set is:
 
 ```text
 ["G1", "G2", "G3", "G4"]
@@ -1030,14 +1140,12 @@ If a change uses:
 ["ALL"]
 ```
 
-do **not** count `ALL` as one group.
+count the actual groups represented by `ALL`.
 
-Instead, determine how many actual timetable groups `ALL` represents from the timetable.
-
-For example, if the timetable contains G1 through G6:
+If the timetable contains G1 through G6:
 
 ```text
-groupsInvolved: ["ALL"]
+["ALL"]
 ```
 
 means:
@@ -1049,7 +1157,7 @@ maxNumOfGroups: 6
 If the timetable contains G1 through G10:
 
 ```text
-groupsInvolved: ["ALL"]
+["ALL"]
 ```
 
 means:
@@ -1062,171 +1170,151 @@ If there are no meaningful changes:
 
 ```text
 maxNumOfGroups: 0
-```
-
-and:
-
-```text
 changesFromAtoB: []
 ```
 
 ---
 
-# 20. Avoid Duplicate Changes
+# 24. Avoid Duplicate Changes
 
 Each logical session change must appear **only once**.
 
-Do not duplicate a change because:
+Do not duplicate changes because:
 
-* The session appears in multiple cells
-* The session affects multiple groups
-* The timetable contains merged cells
-* The same information is repeated
-* The same change can be observed from multiple positions
+* the session appears in multiple cells;
+* the session affects multiple groups;
+* merged cells repeat the session;
+* the same information appears in multiple locations;
+* the same change can be observed from several cells.
 
-Merge all equivalent occurrences into one logical change.
+Merge equivalent occurrences.
 
-For example, if the same `Lecture : IA` session moves for G1, G2, and G3, return:
+Example:
+
+If one `LECTURE` for G1, G2, and G3 moved from Wednesday to Tuesday, return one change:
 
 ```text
 groupsInvolved: ["G1", "G2", "G3"]
 ```
 
-not three separate changes.
+not three changes.
 
 ---
 
-# 21. Final Verification
+# 25. No Meaningful Change
 
-Before producing the final result, perform a complete verification.
+If Table A and Table B contain the same logical timetable and there are no meaningful changes:
 
-Check the entire timetable and:
+```text
+{
+  "maxNumOfGroups": 0,
+  "changesFromAtoB": []
+}
+```
 
-1. Understand the structure of both tables.
-2. Identify logical sessions.
-3. Identify the full first-line session title for each session where available.
-4. Match sessions across A and B using all available evidence.
-5. Re-check sessions that moved position.
-6. Re-check sessions whose day changed.
-7. Re-check sessions whose time changed.
-8. Re-check sessions whose classroom changed.
-9. Re-check sessions whose teacher changed.
-10. Check for genuine additions.
-11. Check for genuine removals.
-12. Do not turn moved sessions into additions/removals.
-13. Ignore superficial formatting differences.
-14. Treat obvious acronym/full-name equivalents as the same when context confirms them.
-15. Distinguish different session types such as `Lecture`, `Tutorial`, `TP`, `TD`, etc.
-16. Merge duplicate representations caused by merged cells.
-17. Merge changes affecting multiple groups into one change.
-18. Ensure every logical session change appears only once.
-19. Ensure `sessionTitleInvolved` identifies the full logical session title, preferably the first line of the cell.
-20. Ensure `changeTarget` is one of the allowed enum values.
-21. Ensure `from` and `to` contain only allowed fields.
-22. Ensure modified sessions include **only fields that actually changed** in `from` and `to`.
-23. Ensure additions use `from: null`.
-24. Ensure removals use `to: null`.
-25. Calculate `maxNumOfGroups` correctly.
-26. If there are no meaningful changes, return an empty `changesFromAtoB` array and `maxNumOfGroups: 0`.
+Do not report:
+
+* formatting changes;
+* capitalization changes;
+* whitespace changes;
+* punctuation changes;
+* equivalent abbreviations;
+* equivalent session-type wording;
+* harmless spelling differences.
 
 ---
 
-# 22. Output Requirements
+# 26. Efficiency and Reasoning
 
-The output must conform **exactly** to the provided schema.
+Use a **compact, structured analysis process**.
 
-Allowed top-level fields:
+Internally follow this plan:
+
+1. Identify timetable structure.
+2. Extract logical sessions from A.
+3. Extract logical sessions from B.
+4. Determine subject, session type, groups, day, time, teacher, and classroom.
+5. Match A sessions to B sessions.
+6. Detect additions and removals only after matching.
+7. Compare matched sessions.
+8. Create the smallest meaningful change.
+9. Merge duplicate/group-equivalent changes.
+10. Calculate `maxNumOfGroups`.
+11. Validate the final object against the schema.
+
+Do not spend excessive reasoning on obvious cases.
+
+Prefer the **shortest reliable reasoning path**.
+
+Do not repeatedly reconsider a session once the available evidence clearly establishes its identity.
+
+---
+
+# 27. Final Verification
+
+Before returning the result, quickly verify:
+
+1. Both timetable structures were understood.
+2. Logical sessions were identified.
+3. Subject titles contain **only the subject**, not the session type.
+4. Session types are one of:
+
+   * `LECTURE`
+   * `TUTORIAL`
+   * `LAB`
+   * `NONE`
+5. Session type was inferred from equivalent terminology such as `cours` when appropriate.
+6. Implicit lecture/course evidence was considered when reliable.
+7. Sessions were matched before additions/removals were determined.
+8. Moved sessions were not turned into additions/removals.
+9. Subject acronyms/full names were matched when context supports equivalence.
+10. Superficial formatting differences were ignored.
+11. Different session types were distinguished when appropriate.
+12. Duplicate representations were merged.
+13. Changes affecting multiple groups were merged.
+14. Each logical session appears at most once.
+15. `changeTarget` is valid.
+16. `from` and `to` contain only allowed fields.
+17. Modified sessions contain only fields that actually changed.
+18. Additions use `from: null`.
+19. Removals use `to: null`.
+20. `maxNumOfGroups` is correct.
+21. No information was invented.
+
+---
+
+# 28. Final Output Rules
+
+Return **only** the structured result.
+
+Do not return:
+
+* explanations;
+* reasoning;
+* comments;
+* markdown;
+* code fences;
+* analysis;
+* confidence scores;
+* extra properties;
+* session identifiers not defined by the schema.
+
+The only top-level properties are:
 
 ```text
 maxNumOfGroups
 changesFromAtoB
 ```
 
-Each change must contain:
+Each change contains exactly:
 
 ```text
 groupsInvolved
-sessionTitleInvolved
+subjectTitle
+sessionType
 changeTarget
 from
 to
 ```
 
-`groupsInvolved` may contain only:
-
-```text
-ALL
-G1
-G2
-G3
-G4
-G5
-G6
-G7
-G8
-G9
-G10
-```
-
-`changeTarget` may contain only:
-
-```text
-WHOLE_SESSION
-TIME
-DAY+TIME
-CLASSROOM
-TEACHER
-```
-
-or `null` when appropriate.
-
-`from` and `to` may contain only:
-
-```text
-teacher
-classroom
-startTime
-day
-```
-
-or be `null`.
-
-Do not output any additional properties.
-
-Do not output explanations.
-
-Do not output markdown.
-
-Do not output comments.
-
-Do not output reasoning.
-
-Return only the structured result expected by the schema.
-
----
-
-# Important Rule
-
-**Always match the same logical session across Table A and Table B before deciding whether it was added, removed, or modified.**
-
-A session changing its **day, time, classroom, or teacher is still the same logical session** when the available evidence indicates that it is the same session.
-
-**The first line of a timetable session is normally its full session title/identifier. Preserve that complete title in `sessionTitleInvolved`, including the session type.**
-
-For example:
-
-```text
-Lecture : IA
-```
-
-should be identified as:
-
-```text
-sessionTitleInvolved: "Lecture : IA"
-```
-
-**not**:
-
-```text
-sessionTitleInvolved: "IA"
-```
+The final result must conform exactly to the provided Zod schema.
