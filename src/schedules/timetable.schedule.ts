@@ -24,6 +24,7 @@ import { extractTables } from "../utils/timetable/extractTables";
 import { cleanTable } from "../utils/timetable/cleanTable";
 import { normalizeGrid } from "../utils/timetable/normalizeGrid";
 import { parseTableGrid } from "../utils/timetable/parseTableGrid";
+import { resolveTimetableChanges } from "../utils/timetable/resolveTimetableChanges";
 
 function hashText(text: string): string {
   return createHash("sha256").update(text, "utf8").digest("hex");
@@ -222,13 +223,21 @@ cron.schedule(
               continue;
             }
 
-            logger.debug(aiResult, "AI has responded.");
+            const resolvedResult = resolveTimetableChanges(aiResult);
 
-            if (aiResult.changesFromAtoB.length === 0) {
+            logger.debug(
+              {
+                raw: aiResult,
+                resolved: resolvedResult,
+              },
+              "Timetable changes resolved.",
+            );
+
+            if (resolvedResult.changesFromAtoB.length === 0) {
               break;
             }
 
-            timetable.aiResponse = aiResult;
+            timetable.aiResponse = resolvedResult;
             break;
           }
 
@@ -259,9 +268,11 @@ cron.schedule(
 🚨📅 لقد تم تحديث جدول توقيت ${update.section.displayShort} 🚨!
 📅 Timetable of ${update.section.displayShort} was updated!
 
+✨ AI Analysis :
+
 ${aiResultToString(update.section, update.aiResponse)}
 
-[📄pdf](${pdfUrl}) [🔗source](${sourceUrl})`
+[📄pdf](${pdfUrl}) [🔗source](${sourceUrl}) • AI can mistake`
               .trim()
               .replace(/([_~`#+\-=|{}.!\\])/g, "\\$1"),
             {
@@ -312,7 +323,7 @@ function aiResultToString(
               : ""
       }${change.subjectTitle.trim().toUpperCase()}`;
 
-      let prefix = '';
+      let prefix = "";
       let content = "";
       if (change.from && change.to) {
         if (change.from.teacher !== change.to.teacher) {
@@ -322,15 +333,15 @@ function aiResultToString(
           content += `\n> ${change.from.classroom ?? "❌"} ➜ ${change.to.classroom ?? "❌"}`;
         }
         if (change.from.day !== change.to.day) {
-          content += `\n> ${change.from.day} ${change.from.startTime}\n➜ ${change.to.day} ${change.to.startTime}`;
+          content += `\n> ${change.from.day} ${change.from.startTime}\n> ➜ ${change.to.day} ${change.to.startTime}`;
         } else if (change.from.startTime !== change.to.startTime) {
           content += `\n> ${change.from.startTime} ➜ ${change.to.startTime}`;
         }
       } else if (change.from) {
-        prefix = ' ❌';
+        prefix = " ❌";
         content += `\n> 🠊 ${change.from.day} ${change.from.startTime}`;
       } else if (change.to) {
-        prefix = ' 🆕';
+        prefix = " 🆕";
         content += `\n> 🠈 ${change.to.day} ${change.to.startTime}`;
       }
 
