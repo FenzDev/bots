@@ -11,10 +11,10 @@ import {
 import { prompts } from "../../prompts";
 
 const timetableSessionSchema = z.object({
-  teacher:z.string().optional(),
-  classroom:z.string().optional(),
-  startTime:z.string().optional(),
-  day:z.string().optional(),
+  teacher:z.string().nullable(),
+  classroom:z.string().nullable(),
+  startTime:z.string().nullable(),
+  day:z.string().nullable(),
 });
 const timetableCheckAIResultSchema = z.object({
   numOfAllGroupsExistingInTable: z.number(),
@@ -33,6 +33,8 @@ const timetableCheckAIResultSchema = z.object({
           "G8",
           "G9",
           "G10",
+          "G11",
+          "G12",
         ]),
       ),
       subjectTitle:z.string(),
@@ -42,13 +44,6 @@ const timetableCheckAIResultSchema = z.object({
         'LAB',
         'NONE'
       ]),
-      changeTarget: z.nullable(z.enum([
-        'WHOLE_SESSION',
-        'TIME',
-        'DAY+TIME',
-        'CLASSROOM',
-        'TEACHER',
-      ])),
       from:z.nullable(timetableSessionSchema),
       to:z.nullable(timetableSessionSchema),
     }),

@@ -297,7 +297,8 @@ function aiResultToString(
 
       const groups =
         change.groupsInvolved.includes("ALL") ||
-        aiResponse.numOfAllGroupsExistingInTable === change.groupsInvolved.length
+        aiResponse.numOfAllGroupsExistingInTable ===
+          change.groupsInvolved.length
           ? `#section #${section.displayShort?.trim().toLowerCase().replaceAll(" ", "_")}`
           : change.groupsInvolved.map((g) => `#${g.toLowerCase()}`).join(" ");
 
@@ -311,45 +312,29 @@ function aiResultToString(
               : ""
       }${change.subjectTitle.trim().toUpperCase()}`;
 
-      let content;
-      if (!change.from) {
-        content = change.to!.teacher
-          ? `➕👨‍🏫 **${change.to!.teacher}\n**`
-          : "" + change.to!.classroom
-            ? `➕📍 **${change.to!.teacher}\n**`
-            : "" + change.to!.day && change.to!.startTime
-              ? `➕🕑 **${change.to!.day} ${change.to!.startTime}**\n`
-              : change.to!.startTime
-                ? `➕🕑 **${change.to!.startTime}**\n`
-                : "" + change.to!.day
-                  ? `➕🕑 **${change.to!.day}**\n`
-                  : "";
-      } else if (!change.to) {
-        content = change.from!.teacher
-          ? `➖👨‍🏫 **${change.from!.teacher}\n**`
-          : "" + change.from!.classroom
-            ? `➖📍 **${change.from!.teacher}\n**`
-            : "" + change.from!.day && change.from!.startTime
-              ? `➖🕑 **${change.from!.day} ${change.from!.startTime}**\n`
-              : change.from!.startTime
-                ? `➖🕑 **${change.from!.startTime}**\n`
-                : "" + change.from!.day
-                  ? `➖🕑 **${change.from!.day}**\n`
-                  : "";
-      } else {
-        content =
-          change.changeTarget === "TEACHER"
-            ? `👨‍🏫 **${change.from.teacher} ➜ ${change.to.teacher}**`
-            : change.changeTarget === "CLASSROOM"
-              ? `📍 **${change.from.classroom} ➜ ${change.to.classroom}**`
-              : change.changeTarget === "DAY+TIME"
-                ? `🕑 **${change.from.day} ${change.from.startTime} ➜ ${change.to.day} ${change.to.startTime}**`
-                : change.changeTarget === "TIME"
-                  ? `🕑 **${change.from.startTime} ➜ ${change.to.startTime}**`
-                  : "";
+      let prefix = '';
+      let content = "";
+      if (change.from && change.to) {
+        if (change.from.teacher !== change.to.teacher) {
+          content += `\n> ${change.from.teacher ?? "❌"} ➜ ${change.to.teacher ?? "❌"}`;
+        }
+        if (change.from.classroom !== change.to.classroom) {
+          content += `\n> ${change.from.classroom ?? "❌"} ➜ ${change.to.classroom ?? "❌"}`;
+        }
+        if (change.from.day !== change.to.day) {
+          content += `\n> ${change.from.day} ${change.from.startTime}\n➜ ${change.to.day} ${change.to.startTime}`;
+        } else if (change.from.startTime !== change.to.startTime) {
+          content += `\n> ${change.from.startTime} ➜ ${change.to.startTime}`;
+        }
+      } else if (change.from) {
+        prefix = ' ❌';
+        content += `\n> 🠊 ${change.from.day} ${change.from.startTime}`;
+      } else if (change.to) {
+        prefix = ' 🆕';
+        content += `\n> 🠈 ${change.to.day} ${change.to.startTime}`;
       }
 
-      return `> 🔴 ${sessionTitle} ${groups}\n> ${content}`;
+      return `> 🔴${prefix} ${sessionTitle} ${groups} ${content}`;
     })
     .join("\n\n");
 }
