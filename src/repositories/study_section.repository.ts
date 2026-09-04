@@ -7,6 +7,7 @@ export type StudySection = {
   name: string;
   displayLong?: string;
   displayShort?: string;
+  sectionLetter?: string;
   timetableBroadcastChatId?: number;
   timetableBroadcastThreadId?: number | null;
   timetableGID?: string;

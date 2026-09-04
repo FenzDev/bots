@@ -12,20 +12,15 @@ import { createHash } from "crypto";
 import {
   TELEGRAM_TIMETABLEBOT_USERNAME,
   TIMETABLE_CHECK_SCHEDULE,
+  TIMETABLE_CHECK_SETTLEMENT_DELAY,
 } from "../config/env";
-import { runAIApp, timetableAIApp } from "../services/ai";
-import { prompts } from "../services/ai/prompts";
-import {
-  TimetableCheckAIResult,
-  TimetableSession,
-} from "../services/ai/apps/timetablecheck";
-import { unzipHtmlFiles, ZipHtmlFile } from "../utils/timetable/unzipHtml";
+import { unzipHtmlFiles } from "../utils/timetable/unzipHtml";
 import { extractTables } from "../utils/timetable/extractTables";
 import { cleanTable } from "../utils/timetable/cleanTable";
 import { normalizeGrid } from "../utils/timetable/normalizeGrid";
-import { parseTableGrid, TableGrid } from "../utils/timetable/parseTableGrid";
-import { resolveTimetableChanges } from "../utils/timetable/resolveTimetableChanges";
-import { normalizeTimeString, tryNormalizeDayString } from "../utils/timetable/normalizeStrings";
+import { parseTableGrid } from "../utils/timetable/parseTableGrid";
+import { compareTables, GroupsDiff } from "../utils/timetable/compareTables";
+import { parseTimetableObject } from "../utils/timetable/parseTimetableObject";
 
 function hashText(text: string): string {
   return createHash("sha256").update(text, "utf8").digest("hex");
@@ -68,8 +63,6 @@ async function parseTimetableZip(
   return result;
 }
 
-
-
 let timetableCheckRunning = false;
 
 cron.schedule(
@@ -94,7 +87,7 @@ cron.schedule(
         section: StudySection;
         newHash: string;
         newGridJSON?: string;
-        aiResponse?: TimetableCheckAIResult;
+        diffs?: GroupsDiff[];
       };
 
       const updatedTimetables: SectionUpdate[] = [];
@@ -124,7 +117,7 @@ cron.schedule(
         let stableHash = newHash;
 
         while (true) {
-          await new Promise((resolve) => setTimeout(resolve, 10_000));
+          await new Promise((resolve) => setTimeout(resolve, TIMETABLE_CHECK_SETTLEMENT_DELAY*1000));
 
           const latestCSV = await downloadText(downloadUrl);
           const latestHash = hashText(latestCSV);
@@ -166,7 +159,7 @@ cron.schedule(
         });
       }
 
-      // For each stable update, download the HTML and pass it to AI
+      // For each stable update, download the HTML and analyse diffs
       // to determine the actual differences.
       if (updatedTimetables.length > 0) {
         const zipBuffer = await downloadBuffer(`${baseDownloadUrl}?format=zip`);
@@ -207,42 +200,20 @@ cron.schedule(
             continue;
           }
 
-          for (let step = 0; step < 3; step++) {
-            logger.debug("Running AI checker.");
-            const aiResult = await runAIApp(
-              timetableAIApp,
-              {
-                tableAGridJSON: timetable.section.timetableCurrentGridJSON,
-                tableBGridJSON: timetable.newGridJSON,
-              },
-              prompts["instructions/timetablebot/compare"],
+          // parse grids into objects
+          const timetableA = parseTimetableObject(
+            JSON.parse(timetable.section.timetableCurrentGridJSON),
+          );
+          const timetableB = parseTimetableObject(htmlFile.grid);
+
+          if (!timetableA || !timetableB) {
+            throw new Error(
+              "Timetable grids are unparssable probally devs fault",
             );
-
-            if (typeof aiResult === "string") {
-              logger.error(
-                { aiResult },
-                "AI returned an unexpected string response.",
-              );
-              continue;
-            }
-
-            const resolvedResult = resolveTimetableChanges(aiResult);
-
-            logger.debug(
-              {
-                raw: aiResult,
-                resolved: resolvedResult,
-              },
-              "Timetable changes resolved.",
-            );
-
-            if (resolvedResult.changesFromAtoB.length === 0) {
-              break;
-            }
-
-            timetable.aiResponse = resolvedResult;
-            break;
           }
+
+          // Get the diffs
+          timetable.diffs = compareTables(timetableA, timetableB);
 
           // Persist the stable hash/grid only after the debounce + comparison.
           studySections.setStudySection({
@@ -255,8 +226,8 @@ cron.schedule(
         let update: SectionUpdate | undefined;
 
         while ((update = updatedTimetables.shift())) {
-          if (!update.aiResponse) {
-            logger.debug("AI decided to discard change broadcast.");
+          if (!update.diffs?.length) {
+            logger.debug("No realistic differences in any session.");
             continue;
           }
 
@@ -271,13 +242,11 @@ cron.schedule(
 🚨📅 لقد تم تحديث جدول توقيت ${update.section.displayShort} 🚨!
 📅 Timetable of ${update.section.displayShort} was updated!
 
-✨ AI Analysis :
+${diffResultToText(update.section, update.diffs)}
 
-${aiResultToString(update.section, update.aiResponse)}
-
-[📄pdf](${pdfUrl}) [🔗source](${sourceUrl}) • AI can mistake`
+[📄pdf](${escapeCommonMD(pdfUrl)}) [🔗source](${escapeCommonMD(sourceUrl)})`
               .trim()
-              .replace(/([_~`#+\-=|{}.!\\])/g, "\\$1"),
+              .replace(/([`#+\-=|{}.!])/g, "\\$1"),
             {
               parse_mode: "MarkdownV2",
               message_thread_id:
@@ -297,58 +266,29 @@ ${aiResultToString(update.section, update.aiResponse)}
   { logger },
 );
 
-function aiResultToString(
-  section: StudySection,
-  aiResponse: TimetableCheckAIResult,
-) {
-  logger.debug({ aiResponse, section }, "generating ai result string");
-  return aiResponse.changesFromAtoB
-    .map((change) => {
-      if (!change?.from && !change?.to)
-        throw new Error(
-          "in one of the elements of changeFromAtoB, from and to are both null.",
-        );
+function diffResultToText(section: StudySection, diffs: GroupsDiff[]) {
+  logger.debug({ diffs, section }, "generating ai result string");
+  return diffs
+    .map((groupsDiff) => {
+      const groups = groupsDiff.hasAllGroups
+        ? `#${section.displayShort?.toLowerCase().replaceAll(" ", "\\_")} #section`
+        : groupsDiff.groups.map((g) => `#${section.sectionLetter?.toLowerCase() ?? 'g'}${g}`).join(" ");
 
-      const groups =
-        change.groupsInvolved.includes("ALL") ||
-        aiResponse.numOfAllGroupsExistingInTable ===
-          change.groupsInvolved.length
-          ? `#section #${section.displayShort?.trim().toLowerCase().replaceAll(" ", "_")}`
-          : change.groupsInvolved.map((g) => `#${g.toLowerCase()}`).join(" ");
+      const dayTime = `${groupsDiff.day} ${groupsDiff.startTime}`;
 
-      const sessionTitle = `${
-        change.sessionType === "LECTURE"
-          ? "Cours "
-          : change.sessionType === "TUTORIAL"
-            ? "TD "
-            : change.sessionType === "LAB"
-              ? "TP "
-              : ""
-      }${change.subjectTitle.trim().toUpperCase()}`;
+      const content = groupsDiff.diff
+        .map((d) => {
+          const [prefix,postfix] =
+            d.type === "add" ? ["*__","__*"] : d.type === "remove" ? ["~","~"] : ["",""];
+          return `${prefix}${escapeCommonMD(d.text)}${postfix}`.trim();
+        })
+        .join(" ");
 
-      let prefix = "";
-      let content = "";
-      if (change.from && change.to) {
-        if (change.from.teacher !== change.to.teacher) {
-          content += `\n> ${change.from.teacher ?? "❌"} ➜ ${change.to.teacher ?? "❌"}`;
-        }
-        if (change.from.classroom !== change.to.classroom) {
-          content += `\n> ${change.from.classroom ?? "❌"} ➜ ${change.to.classroom ?? "❌"}`;
-        }
-        if (change.from.day !== change.to.day) {
-          content += `\n> ${change.from.day} ${change.from.startTime}\n> ➜ ${change.to.day} ${change.to.startTime}`;
-        } else if (change.from.startTime !== change.to.startTime) {
-          content += `\n> ${change.from.startTime} ➜ ${change.to.startTime}`;
-        }
-      } else if (change.from) {
-        prefix = " ❌";
-        content += `\n> 🠊 ${change.from.day} ${change.from.startTime}`;
-      } else if (change.to) {
-        prefix = " 🆕";
-        content += `\n> 🠈 ${change.to.day} ${change.to.startTime}`;
-      }
-
-      return `> 🔴${prefix} ${sessionTitle} ${groups} ${content}`;
+      return `> 🔴 ${groups}\n> ${dayTime}\n> ${content}`;
     })
     .join("\n\n");
+}
+
+function escapeCommonMD(text:string) {
+  return text.replace(/([*~_\[\]\(\)\\])/g, "\\$1");
 }

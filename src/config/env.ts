@@ -24,6 +24,7 @@ const envSchema = z.object({
   DB_MAX_HISTORY_MESSAGES: z.coerce.number(),
   GOOGLE_AI_API_KEY: z.string().nonempty(),
   TIMETABLE_CHECK_SCHEDULE: cronSchema,
+  TIMETABLE_CHECK_SETTLEMENT_DELAY: z.coerce.number(),
 });
 
 const result = envSchema.safeParse(process.env);
@@ -54,6 +55,7 @@ export const {
   DB_MAX_HISTORY_MESSAGES,
 
   TIMETABLE_CHECK_SCHEDULE,
+  TIMETABLE_CHECK_SETTLEMENT_DELAY,
   
   MONGODB_URI,
   GOOGLE_AI_API_KEY,

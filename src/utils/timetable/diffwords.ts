@@ -90,5 +90,5 @@ export function diffWords(oldText: string, newText: string): DiffPart[] {
     }
   }
 
-  return merged;
+  return merged.filter(diff => diff.text !== '');
 }
