@@ -274,7 +274,7 @@ function diffResultToText(section: StudySection, diffs: GroupsDiff[]) {
         ? `#${section.displayShort?.toLowerCase().replaceAll(" ", "\\_")} #section`
         : groupsDiff.groups.map((g) => `#${section.sectionLetter?.toLowerCase() ?? 'g'}${g}`).join(" ");
 
-      const dayTime = `${groupsDiff.day} ${groupsDiff.startTime}`;
+      const dayTime = groupsDiff.day === 'Online'? groupsDiff: `${groupsDiff.day} ${groupsDiff.startTime}`;
 
       const content = groupsDiff.diff
         .map((d) => {
