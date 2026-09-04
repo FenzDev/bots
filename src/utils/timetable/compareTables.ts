@@ -7,6 +7,8 @@ export type GroupsDiff = {
   day: string;
   startTime: string;
   hasAllGroups: boolean;
+  isPureAdd: boolean;
+  isPureRemove: boolean;
   diff: DiffPart[];
 };
 
@@ -46,6 +48,8 @@ export function compareTables(timetableA: Timetable, timetableB: Timetable) {
         startTime,
         diff,
         hasAllGroups: false,
+        isPureAdd: false,
+        isPureRemove: false,
       };
 
       // merge equivalent groups
@@ -71,9 +75,9 @@ export function compareTables(timetableA: Timetable, timetableB: Timetable) {
 
   // sort diffs pure-removes -> pure-aditions -> mix
   const sortEval = (gDiff: GroupsDiff) =>
-    gDiff.diff.every((d) => d.type === "remove")
+    (gDiff.isPureRemove = gDiff.diff.every((d) => d.type === "remove"))
       ? -1
-      : gDiff.diff.every((d) => d.type === "add")
+      : (gDiff.isPureAdd = gDiff.diff.every((d) => d.type === "add"))
         ? 1
         : 2;
   diffs.sort((a, b) => sortEval(a) - sortEval(b));

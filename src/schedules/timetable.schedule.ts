@@ -274,15 +274,19 @@ function diffResultToText(section: StudySection, diffs: GroupsDiff[]) {
         ? `#${section.displayShort?.toLowerCase().replaceAll(" ", "\\_")} #section`
         : groupsDiff.groups.map((g) => `#${section.sectionLetter?.toLowerCase() ?? 'g'}${g}`).join(" ");
 
-      const dayTime = groupsDiff.day === 'Online'? groupsDiff: `${groupsDiff.day} ${groupsDiff.startTime}`;
+      const dayTime = `${groupsDiff.day} ${groupsDiff.startTime}`;
 
-      const content = groupsDiff.diff
+      const content = `${
+        groupsDiff.isPureAdd? '➕':
+        groupsDiff.isPureRemove? '➖':
+        '✏'
+      } ${groupsDiff.diff
         .map((d) => {
           const [prefix,postfix] =
             d.type === "add" ? ["*__","__*"] : d.type === "remove" ? ["~","~"] : ["",""];
           return `${prefix}${escapeCommonMD(d.text)}${postfix}`.trim();
         })
-        .join(" ");
+        .join(" ")}`;
 
       return `> 🔴 ${groups}\n> ${dayTime}\n> ${content}`;
     })
