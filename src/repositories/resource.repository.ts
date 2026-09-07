@@ -14,6 +14,7 @@ export interface Resource {
 export interface ResourceFile {
   _id: ObjectId;
   resourceId: ObjectId;
+  pendingId?: ObjectId;
   fileId: string;
   fileName: string;
   telegramStoredMessageId: number;
