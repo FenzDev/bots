@@ -15,9 +15,10 @@ export interface ResourceFile {
   _id: ObjectId;
   resourceId: ObjectId;
   pendingId?: ObjectId;
+  mediaGroupId?: string;
   fileId: string;
   fileName: string;
-  telegramStoredMessageId: number;
+  telegramStoredMessageId?: number;
   insertedAt: Date;
 }
 
@@ -66,10 +67,6 @@ export async function findResourceByName(
 /**
  * Find all resources whose name starts with a prefix.
  *
- * Example:
- * "s5_gl" matches:
- *   s5_gl_exoexam_blabla_0
- *   s5_gl_cours_bli_bli_bli
  */
 export async function findResourcesByNamePrefix(
   prefix: string
@@ -158,6 +155,18 @@ export async function findResourceFiles(
 ): Promise<ResourceFile[]> {
   return resourceFilesCollection
     .find({ resourceId })
+    .sort({ insertedAt: 1 })
+    .toArray();
+}
+
+/**
+ * Get all files belonging to a media group.
+ */
+export async function findMediaGroupFiles(
+  mediaGroupId: string
+): Promise<ResourceFile[]> {
+  return resourceFilesCollection
+    .find({ mediaGroupId })
     .sort({ insertedAt: 1 })
     .toArray();
 }
