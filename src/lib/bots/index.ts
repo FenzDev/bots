@@ -11,9 +11,18 @@ import logger from "../logger";
 import { fileURLToPath } from "url";
 
 export const chillBot = new Bot(TELEGRAM_CHILLBOT_TOKEN);
-export const timetableBot = new Bot(TELEGRAM_TIMETABLEBOT_TOKEN);
-export const guardBot = new Bot(TELEGRAM_GUARDBOT_TOKEN);
-export const resourcesBot = new Bot(TELEGRAM_RESOURCESBOT_TOKEN);
+export const timetableBot =
+  TELEGRAM_CHILLBOT_TOKEN === TELEGRAM_TIMETABLEBOT_TOKEN
+    ? chillBot
+    : new Bot(TELEGRAM_TIMETABLEBOT_TOKEN);
+export const guardBot =
+  TELEGRAM_CHILLBOT_TOKEN === TELEGRAM_GUARDBOT_TOKEN
+    ? chillBot
+    : new Bot(TELEGRAM_GUARDBOT_TOKEN);
+export const resourcesBot =
+  TELEGRAM_CHILLBOT_TOKEN === TELEGRAM_RESOURCESBOT_TOKEN
+    ? chillBot
+    : new Bot(TELEGRAM_RESOURCESBOT_TOKEN);
 
 const botHandlers = [
   ["chillbot", chillBot],
@@ -22,18 +31,19 @@ const botHandlers = [
   ["timetablebot", timetableBot],
 ] as const;
 
-export async function handleBots(systemHandle:(bot:Bot)=>Promise<void>|void) {
+export async function handleBots(
+  systemHandle: (bot: Bot) => Promise<void> | void,
+) {
   try {
-    for (const [name,bot] of botHandlers)
-      {
+    for (const [name, bot] of botHandlers) {
       await systemHandle(bot);
 
       const handlersDirectory = fileURLToPath(
         new URL(`../../handlers/${name}/`, import.meta.url),
       );
 
-      const {num,maxNum} = await loadHandlers(bot, handlersDirectory);
-      
+      const { num, maxNum } = await loadHandlers(bot, handlersDirectory);
+
       logger.info(`${num}/${maxNum} ${name} handlers were loaded.`);
     }
     {
@@ -41,12 +51,12 @@ export async function handleBots(systemHandle:(bot:Bot)=>Promise<void>|void) {
         new URL(`../../handlers/shared/`, import.meta.url),
       );
       const uniqueBots = new Set<string>();
-      let {num,maxNum} = {num:0,maxNum:0};
-      for (const [name,bot] of botHandlers) {
+      let { num, maxNum } = { num: 0, maxNum: 0 };
+      for (const [name, bot] of botHandlers) {
         if (uniqueBots.has(bot.token)) continue;
-        
-        ({num,maxNum} = await loadHandlers(bot, sharedHandlersDirectory));
-        
+
+        ({ num, maxNum } = await loadHandlers(bot, sharedHandlersDirectory));
+
         if (num !== maxNum) break;
 
         uniqueBots.add(bot.token);
