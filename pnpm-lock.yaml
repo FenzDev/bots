@@ -240,12 +240,6 @@ importers:
       pino:
         specifier: ^10.3.1
         version: 10.3.1
-      react:
-        specifier: ^19.2.8
-        version: 19.2.8
-      react-dom:
-        specifier: ^19.2.8
-        version: 19.2.8(react@19.2.8)
       unzipper:
         specifier: ^0.12.5
         version: 0.12.5
@@ -262,12 +256,6 @@ importers:
       '@types/node-cron':
         specifier: ^3.0.11
         version: 3.0.11
-      '@types/react':
-        specifier: ^19.2.18
-        version: 19.2.18
-      '@types/react-dom':
-        specifier: ^19.2.5
-        version: 19.2.5(@types/react@19.2.18)
       '@types/unzipper':
         specifier: ^0.10.11
         version: 0.10.11
@@ -286,9 +274,6 @@ importers:
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
-      vite:
-        specifier: ^8.2.2
-        version: 8.2.2(@types/node@26.3.0)(esbuild@0.28.2)(tsx@4.23.12)
 
 packages:
 
@@ -2020,10 +2005,12 @@ snapshots:
   '@types/react-dom@19.2.5(@types/react@19.2.18)':
     dependencies:
       '@types/react': 19.2.18
+    optional: true
 
   '@types/react@19.2.18':
     dependencies:
       csstype: 3.2.3
+    optional: true
 
   '@types/retry@0.12.0': {}
 
@@ -2251,7 +2238,8 @@ snapshots:
 
   css-what@6.2.2: {}
 
-  csstype@3.2.3: {}
+  csstype@3.2.3:
+    optional: true
 
   d3-color@3.1.0: {}
 

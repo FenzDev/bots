@@ -50,7 +50,7 @@ export type PendingRequestInput = Omit<
 const pendingRequestsCollection =
   db.collection<PendingRequest>("pending_requests");
 
-  export async function createPendingRequest(
+async function createPendingRequest(
   input: PendingRequestInput
 ): Promise<PendingRequest> {
   const request: PendingRequest = {
@@ -65,15 +65,15 @@ const pendingRequestsCollection =
   return request;
 }
 
-export async function findPendingRequestById(
-  id: ObjectId
+async function findPendingRequestById(
+id: ObjectId
 ): Promise<PendingRequest | null> {
   return pendingRequestsCollection.findOne({
     _id: id,
   });
 }
 
-export async function findPendingRequests(): Promise<PendingRequest[]> {
+async function findPendingRequests(): Promise<PendingRequest[]> {
   return pendingRequestsCollection
     .find({
       status: "PENDING",
@@ -82,8 +82,7 @@ export async function findPendingRequests(): Promise<PendingRequest[]> {
     .toArray();
 }
 
-
-export async function findPendingRequestsByOwner(
+async function findPendingRequestsByOwner(
   ownerId: number
 ): Promise<PendingRequest[]> {
   return pendingRequestsCollection
@@ -94,7 +93,7 @@ export async function findPendingRequestsByOwner(
     .toArray();
 }
 
-export async function findPendingRequestsByType(
+async function findPendingRequestsByType(
   type: PendingType
 ): Promise<PendingRequest[]> {
   return pendingRequestsCollection
@@ -105,7 +104,7 @@ export async function findPendingRequestsByType(
     .toArray();
 }
 
-export async function approvePendingRequest(
+async function approvePendingRequest(
   id: ObjectId,
   reviewerId: number,
   resourceId: ObjectId
@@ -131,7 +130,7 @@ export async function approvePendingRequest(
   return result;
 }
 
-export async function rejectPendingRequest(
+async function rejectPendingRequest(
   id: ObjectId,
   reviewerId: number,
   rejectionReason?: string
@@ -157,7 +156,7 @@ export async function rejectPendingRequest(
   return result;
 }
 
-export async function deletePendingRequest(
+async function deletePendingRequest(
   id: ObjectId
 ): Promise<boolean> {
   const result = await pendingRequestsCollection.deleteOne({
@@ -167,7 +166,7 @@ export async function deletePendingRequest(
   return result.deletedCount === 1;
 }
 
-export async function findPendingRequestByTelegramMessage(
+async function findPendingRequestByTelegramMessage(
   requestChatId: number,
   requestMessageId: number,
   requestThreadId?: number
@@ -180,3 +179,16 @@ export async function findPendingRequestByTelegramMessage(
       : {}),
   });
 }
+
+
+export const pending = {
+  createPendingRequest,
+  findPendingRequestById,
+  findPendingRequests,
+  findPendingRequestsByOwner,
+  findPendingRequestsByType,
+  approvePendingRequest,
+  rejectPendingRequest,
+  deletePendingRequest,
+  findPendingRequestByTelegramMessage,
+};
