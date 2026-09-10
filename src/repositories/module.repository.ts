@@ -9,12 +9,14 @@ export const resourcesModuleInputSchema = z
     displayShort: z.string().optional(),
     displayLong: z.string().optional(),
 
-    resourcesInputChatId: z.coerce.number().int().safe().optional(),
+    reviewerId: z.coerce.number().optional(),
+
+    resourcesInputChatId: z.coerce.number().int().optional(),
 
     resourcesInputThreadId: z
       .union([
         z.literal("null").transform(() => null),
-        z.coerce.number().int().safe(),
+        z.coerce.number().int(),
       ])
       .optional(),
   })

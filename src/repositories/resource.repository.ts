@@ -1,40 +1,52 @@
 import { ObjectId } from "mongodb";
 import { db } from "../lib/mongodb";
 
-export type ResourceType = "STUDY" | "TIMETABLE";
+import { z } from "zod";
 
-export interface Resource {
-  _id: ObjectId;
-  name: string;
-  type: ResourceType;
-  isMediaGroup: boolean;
-  insertedAt: Date;
-}
+export const resourceSchema = z.object({
+  _id: z.instanceof(ObjectId),
+  name: z.string(),
+  type: z.enum(["STUDY", "TIMETABLE"]),
+  isMediaGroup: z.boolean(),
+  insertedAt: z.date(),
+});
 
-export interface ResourceFile {
-  _id: ObjectId;
-  resourceId: ObjectId;
-  pendingId?: ObjectId;
-  mediaGroupId?: string;
-  fileId: string;
-  fileName: string;
-  telegramStoredMessageId?: number;
-  insertedAt: Date;
-}
+export type Resource = z.infer<typeof resourceSchema>;
 
-export type ResourceInput = Omit<Resource, "_id" | "insertedAt">;
-export type ResourceFileInput = Omit<ResourceFile, "_id" | "insertedAt">;
+export const resourceInputSchema = resourceSchema.omit({
+  _id: true,
+  insertedAt: true,
+});
+
+export type ResourceInput = z.infer<typeof resourceInputSchema>;
+
+export const resourceFileSchema = z.object({
+  _id: z.instanceof(ObjectId),
+  resourceId: z.instanceof(ObjectId),
+  mediaGroupId: z.string().optional(),
+  fileId: z.string(),
+  fileName: z.string(),
+  mimeType: z.string(),
+  telegramStoredMessageId: z.number().optional(),
+  insertedAt: z.date(),
+});
+
+export type ResourceFile = z.infer<typeof resourceFileSchema>;
+
+export const resourceFileInputSchema = resourceFileSchema.omit({
+  _id: true,
+  insertedAt: true,
+});
+
+export type ResourceFileInput = z.infer<typeof resourceFileInputSchema>;
 
 const resourcesCollection = db.collection<Resource>("resources");
-const resourceFilesCollection =
-  db.collection<ResourceFile>("resource_files");
+const resourceFilesCollection = db.collection<ResourceFile>("resource_files");
 
 /**
  * Create a resource.
  */
-export async function createResource(
-  input: ResourceInput
-): Promise<Resource> {
+async function createResource(input: ResourceInput): Promise<Resource> {
   const resource: Resource = {
     _id: new ObjectId(),
     ...input,
@@ -49,18 +61,14 @@ export async function createResource(
 /**
  * Find a resource by its ID.
  */
-export async function findResourceById(
-  id: ObjectId
-): Promise<Resource | null> {
+async function findResourceById(id: ObjectId): Promise<Resource | null> {
   return resourcesCollection.findOne({ _id: id });
 }
 
 /**
  * Find a resource by name.
  */
-export async function findResourceByName(
-  name: string
-): Promise<Resource | null> {
+async function findResourceByName(name: string): Promise<Resource | null> {
   return resourcesCollection.findOne({ name });
 }
 
@@ -68,9 +76,7 @@ export async function findResourceByName(
  * Find all resources whose name starts with a prefix.
  *
  */
-export async function findResourcesByNamePrefix(
-  prefix: string
-): Promise<Resource[]> {
+async function findResourcesByNamePrefix(prefix: string): Promise<Resource[]> {
   return resourcesCollection
     .find({
       name: {
@@ -84,26 +90,21 @@ export async function findResourcesByNamePrefix(
 /**
  * Find resources by type.
  */
-export async function findResourcesByType(
-  type: ResourceType
-): Promise<Resource[]> {
-  return resourcesCollection
-    .find({ type })
-    .sort({ insertedAt: 1 })
-    .toArray();
+async function findResourcesByType(type: ResourceInput['type']): Promise<Resource[]> {
+  return resourcesCollection.find({ type }).sort({ insertedAt: 1 }).toArray();
 }
 
 /**
  * Update a resource.
  */
-export async function updateResource(
+async function updateResource(
   id: ObjectId,
-  update: Partial<Omit<Resource, "_id" | "insertedAt">>
+  update: Partial<Omit<Resource, "_id" | "insertedAt">>,
 ): Promise<Resource | null> {
   const result = await resourcesCollection.findOneAndUpdate(
     { _id: id },
     { $set: update },
-    { returnDocument: "after" }
+    { returnDocument: "after" },
   );
 
   return result;
@@ -112,9 +113,7 @@ export async function updateResource(
 /**
  * Delete a resource and all of its files.
  */
-export async function deleteResource(
-  id: ObjectId
-): Promise<boolean> {
+async function deleteResource(id: ObjectId): Promise<boolean> {
   const result = await resourcesCollection.deleteOne({
     _id: id,
   });
@@ -133,8 +132,8 @@ export async function deleteResource(
 /**
  * Add a file to a resource.
  */
-export async function addResourceFile(
-  input: ResourceFileInput
+async function addResourceFile(
+  input: ResourceFileInput,
 ): Promise<ResourceFile> {
   const file: ResourceFile = {
     _id: new ObjectId(),
@@ -150,8 +149,8 @@ export async function addResourceFile(
 /**
  * Get all files belonging to a resource.
  */
-export async function findResourceFiles(
-  resourceId: ObjectId
+async function findResourceFiles(
+  resourceId: ObjectId,
 ): Promise<ResourceFile[]> {
   return resourceFilesCollection
     .find({ resourceId })
@@ -162,8 +161,8 @@ export async function findResourceFiles(
 /**
  * Get all files belonging to a media group.
  */
-export async function findMediaGroupFiles(
-  mediaGroupId: string
+async function findMediaGroupFiles(
+  mediaGroupId: string,
 ): Promise<ResourceFile[]> {
   return resourceFilesCollection
     .find({ mediaGroupId })
@@ -174,8 +173,8 @@ export async function findMediaGroupFiles(
 /**
  * Find a specific file by its ID.
  */
-export async function findResourceFileById(
-  id: ObjectId
+async function findResourceFileById(
+  id: ObjectId,
 ): Promise<ResourceFile | null> {
   return resourceFilesCollection.findOne({
     _id: id,
@@ -185,8 +184,8 @@ export async function findResourceFileById(
 /**
  * Find a stored file using its Telegram file ID.
  */
-export async function findResourceFileByTelegramFileId(
-  fileId: string
+async function findResourceFileByTelegramFileId(
+  fileId: string,
 ): Promise<ResourceFile | null> {
   return resourceFilesCollection.findOne({
     fileId,
@@ -196,8 +195,8 @@ export async function findResourceFileByTelegramFileId(
 /**
  * Find a stored file using the Telegram message ID.
  */
-export async function findResourceFileByTelegramMessageId(
-  telegramStoredMessageId: number
+async function findResourceFileByTelegramMessageId(
+  telegramStoredMessageId: number,
 ): Promise<ResourceFile | null> {
   return resourceFilesCollection.findOne({
     telegramStoredMessageId,
@@ -207,9 +206,7 @@ export async function findResourceFileByTelegramMessageId(
 /**
  * Delete a resource file.
  */
-export async function deleteResourceFile(
-  id: ObjectId
-): Promise<boolean> {
+async function deleteResourceFile(id: ObjectId): Promise<boolean> {
   const result = await resourceFilesCollection.deleteOne({
     _id: id,
   });
@@ -224,3 +221,22 @@ export async function deleteResourceFile(
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
+
+export const resourceFiles = {
+  addResourceFile,
+  findResourceFiles,
+  findMediaGroupFiles,
+  findResourceFileById,
+  findResourceFileByTelegramFileId,
+  findResourceFileByTelegramMessageId,
+  deleteResourceFile,
+};
+export const resources = {
+  createResource,
+  findResourceById,
+  findResourceByName,
+  findResourcesByNamePrefix,
+  findResourcesByType,
+  updateResource,
+  deleteResource,
+};

@@ -181,7 +181,7 @@ async function findPendingRequestByTelegramMessage(
 }
 
 
-export const pending = {
+export const pendings = {
   createPendingRequest,
   findPendingRequestById,
   findPendingRequests,
