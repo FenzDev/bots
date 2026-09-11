@@ -1,5 +1,5 @@
-import { Bot, Context, InputMediaBuilder } from "grammy";
-import { Message, Update } from "grammy/types";
+import { Bot, Context, InlineKeyboard, InputMediaBuilder } from "grammy";
+import { InlineKeyboardMarkup, Message, Update } from "grammy/types";
 import logger from "../../lib/logger";
 import {
   ResourcesModule,
@@ -21,6 +21,11 @@ export default async (bot: Bot) => {
     return next();
   });
 
+  bot.on("message:video", async (ctx, next) => {
+    await addFileAsRequest(bot, ctx, ctx.message);
+    return next();
+  });
+
   bot.on("message:photo", async (ctx, next) => {
     await addFileAsRequest(bot, ctx, ctx.message);
     return next();
@@ -29,40 +34,102 @@ export default async (bot: Bot) => {
 
 type SupportedMessage =
   | (Message & Update.NonChannel & Record<"document" | "from", {}>)
+  | (Message & Update.NonChannel & Record<"video" | "from", {}>)
   | (Message & Update.NonChannel & Record<"photo" | "from", {}>);
 
 const MEDIA_GROUP_DEBOUNCE_MS = 1_000;
 
-/**
- * Timers are keyed by Telegram's media_group_id.
- *
- * Every new message belonging to the same album clears and recreates
- * its timer. Once no new message arrives for MEDIA_GROUP_DEBOUNCE_MS,
- * the album is considered complete.
- */
 const mediaGroupTimers = new Map<string, NodeJS.Timeout>();
 
-/**
- * Called when we believe a media group is complete.
- *
- * Put your forwarding/reviewer code here.
- */
+function generateRequestInlineKeyboard(
+  moduleInfo: ResourcesModule,
+  requestMessageId: string,
+  allCopyableCommand: boolean,
+) {
+  const commandBase = `/approve ${requestMessageId} res_${moduleInfo.semester}_${moduleInfo.name}_`;
+  return allCopyableCommand
+    ? new InlineKeyboard()
+        .copyText("TD", `${commandBase}td`)
+        .copyText("Lecture", `${commandBase}cours`)
+        .copyText("TP", `${commandBase}tp`)
+        .row()
+        .copyText("Exercises & Exams", `${commandBase}exoexam`)
+        .copyText("Resume", `${commandBase}resume`)
+        .row()
+        .copyText("Other", commandBase)
+        .text("❌ Ignore", "ignore")
+    : new InlineKeyboard()
+        .text("TD", `td:${requestMessageId}`)
+        .text("Lecture", `cours:${requestMessageId}`)
+        .text("TP", `tp:${requestMessageId}`)
+        .row()
+        .text("Exercises & Exams", `exoexam:${requestMessageId}`)
+        .row()
+        .text("Resume", `resume:${requestMessageId}`)
+        .row()
+        .copyText("Other", commandBase)
+        .text("Ignore", "ignore");
+}
+
+async function postRequest<TPreviewInput>(
+  bot: Bot,
+  moduleInfo: ResourcesModule,
+  resourceId: ObjectId,
+  hasImages: boolean,
+  preview: () => Promise<void>,
+) {
+  const reviewerId = moduleInfo.reviewerId ?? TELEGRAM_SUPERADMIN_ID;
+
+  await preview();
+
+  const sentRequestMsg = await bot.api.sendMessage(
+    reviewerId,
+    `
+*Detected a shared resource !*
+Module: *${moduleInfo.displayShort}*
+    `.trim(),
+    {
+      parse_mode: "Markdown",
+    },
+  );
+
+  await pendings.createPendingRequest({
+    requestMessageId: sentRequestMsg.message_id,
+    requestChatId: moduleInfo.reviewerId ?? TELEGRAM_SUPERADMIN_ID,
+    type: "SHARED_RESOURCE",
+    resourceId: resourceId,
+  });
+
+  await bot.api.editMessageReplyMarkup(reviewerId, sentRequestMsg.message_id, {
+    reply_markup: generateRequestInlineKeyboard(
+      moduleInfo,
+      `${sentRequestMsg.message_id}`,
+      hasImages,
+    ),
+  });
+}
+
 async function onMediaGroupComplete(
   bot: Bot,
-  moduleInfo: WithId<ResourcesModule>,
+  moduleInfo: ResourcesModule,
+  resourceId: ObjectId,
   mediaGroupId: string,
 ) {
   const images = await resourceFiles.findMediaGroupFiles(mediaGroupId);
 
-  await bot.api.sendMediaGroup(
-    moduleInfo.reviewerId ?? TELEGRAM_SUPERADMIN_ID,
-    images.map((img) => InputMediaBuilder.photo(img.fileId)),
-  );
+  await postRequest(bot, moduleInfo, resourceId, true, async () => {
+    await bot.api.forwardMessages(
+      moduleInfo.reviewerId ?? TELEGRAM_SUPERADMIN_ID,
+      moduleInfo.resourcesInputChatId!,
+      images.map((img) => img.telegramStoredMessageId!),
+    );
+  });
 }
 
 function scheduleMediaGroupProcessing(
   bot: Bot,
   moduleInfo: WithId<ResourcesModule>,
+  objectId: ObjectId,
   mediaGroupId: string,
 ) {
   // A new message arrived for this album.
@@ -73,13 +140,11 @@ function scheduleMediaGroupProcessing(
     clearTimeout(existingTimer);
   }
 
-  // Start a fresh timer.
   const timer = setTimeout(async () => {
-    // Remove the timer before processing.
     mediaGroupTimers.delete(mediaGroupId);
 
     try {
-      await onMediaGroupComplete(bot, moduleInfo, mediaGroupId);
+      await onMediaGroupComplete(bot, moduleInfo, objectId, mediaGroupId);
     } catch (error) {
       console.error(`Failed to process media group ${mediaGroupId}`, error);
     }
@@ -89,15 +154,17 @@ function scheduleMediaGroupProcessing(
 }
 
 async function addFileAsRequest(bot: Bot, ctx: Context, msg: SupportedMessage) {
-  // Ignore if this isn't one of our module resource chats.
   const moduleInfo = await resourcesModule.findModuleFromInputChat(
     msg.chat.id,
     msg.message_thread_id ?? null,
   );
 
+  // Ignore if this isn't one of our module resource chats.
   if (!moduleInfo) {
     return;
   }
+
+  const tempPendingResourceName = `pending_${moduleInfo.semester}_${moduleInfo.name}_${generateTimestampId()}`;
 
   /*
    * ============================================================
@@ -105,12 +172,9 @@ async function addFileAsRequest(bot: Bot, ctx: Context, msg: SupportedMessage) {
    * ============================================================
    */
 
-  if (msg.media_group_id) {
+  if (msg.media_group_id && msg.photo) {
     const mediaGroupId = msg.media_group_id;
 
-    /*
-     * See whether we've already created a Resource for this album.
-     */
     const existingFiles = await resourceFiles.findMediaGroupFiles(mediaGroupId);
 
     let resourceId: ObjectId;
@@ -128,39 +192,27 @@ async function addFileAsRequest(bot: Bot, ctx: Context, msg: SupportedMessage) {
        * Create the Resource now, but DON'T create the review
        * request yet.
        */
+
       const resource = await resources.createResource({
-        name: `Resource ${generateTimestampId()}`,
+        name: tempPendingResourceName,
         type: "STUDY",
+        isApproved: false,
         isMediaGroup: true,
       });
 
       resourceId = resource._id;
     }
 
-    /*
-     * Store the actual media item.
-     */
-    if (msg.photo) {
-      const largestPhoto = msg.photo.at(-1)!;
+    const largestPhoto = msg.photo.at(-1)!;
 
-      await resourceFiles.addResourceFile({
-        resourceId,
-        fileId: largestPhoto.file_id,
-        fileName: `photo_${generateTimestampId()}.jpg`,
-        mimeType: "image/jpeg",
-        telegramStoredMessageId: msg.message_id,
-        mediaGroupId,
-      });
-    } else if (msg.document) {
-      await resourceFiles.addResourceFile({
-        resourceId,
-        fileId: msg.document.file_id,
-        fileName: msg.document.file_name ?? `file_${generateTimestampId()}`,
-        mimeType: msg.document.mime_type ?? "application/octet-stream",
-        telegramStoredMessageId: msg.message_id,
-        mediaGroupId,
-      });
-    }
+    await resourceFiles.addResourceFile({
+      resourceId,
+      fileId: largestPhoto.file_id,
+      fileName: `photo_${generateTimestampId()}.jpg`,
+      mimeType: "image/jpeg",
+      telegramStoredMessageId: msg.message_id,
+      mediaGroupId,
+    });
 
     /*
      * IMPORTANT:
@@ -171,24 +223,22 @@ async function addFileAsRequest(bot: Bot, ctx: Context, msg: SupportedMessage) {
      * Only when no more messages arrive for the debounce period
      * will onMediaGroupComplete() execute.
      */
-    scheduleMediaGroupProcessing(bot, moduleInfo, mediaGroupId);
+    scheduleMediaGroupProcessing(bot, moduleInfo, resourceId, mediaGroupId);
 
     return;
   }
 
-  /*
-   * ============================================================
-   * SINGLE PHOTO / DOCUMENT
-   * ============================================================
-   */
-
   const resource = await resources.createResource({
-    name: msg.document?.file_name ?? `Resource ${generateTimestampId()}`,
+    name:
+      msg.document?.file_name ??
+      msg.video?.file_name ??
+      tempPendingResourceName,
     type: "STUDY",
+    isApproved: false,
     isMediaGroup: false,
   });
 
-  let file:ResourceFileInput|undefined;
+  let file: ResourceFileInput | undefined;
   if (msg.photo) {
     const largestPhoto = msg.photo.at(-1)!;
     file = {
@@ -197,7 +247,15 @@ async function addFileAsRequest(bot: Bot, ctx: Context, msg: SupportedMessage) {
       fileName: `photo_${generateTimestampId()}.jpg`,
       mimeType: "image/jpeg",
       telegramStoredMessageId: msg.message_id,
-    }
+    };
+  } else if (msg.video) {
+    file = {
+      resourceId: resource._id,
+      fileId: msg.video.file_id,
+      fileName: msg.video.file_name ?? `video_${generateTimestampId()}.mp4`,
+      mimeType: msg.video.mime_type ?? "video/mp4",
+      telegramStoredMessageId: msg.message_id,
+    };
   } else if (msg.document) {
     file = {
       resourceId: resource._id,
@@ -205,26 +263,23 @@ async function addFileAsRequest(bot: Bot, ctx: Context, msg: SupportedMessage) {
       fileName: msg.document.file_name ?? `file_${generateTimestampId()}`,
       mimeType: msg.document.mime_type ?? "application/octet-stream",
       telegramStoredMessageId: msg.message_id,
-    }
+    };
   }
   if (!file) return;
 
   await resourceFiles.addResourceFile(file);
-  /*
-   * Single messages don't need the media-group debounce.
-   *
-   * Your forwarding code can go here.
-   */
 
   const reviewerId = moduleInfo.reviewerId ?? TELEGRAM_SUPERADMIN_ID;
-  const sentRequestMsg = await bot.api.copyMessages(reviewerId, moduleInfo.resourcesInputChatId!, [file.telegramStoredMessageId!])
 
-  if (sentRequestMsg.length <= 0) return;
-
-  await pendings.createPendingRequest({
-    requestMessageId: sentRequestMsg[0].message_id,
-    requestChatId: moduleInfo.reviewerId ?? TELEGRAM_SUPERADMIN_ID,
-    type: "SHARED_RESOURCE",
-    resourceId: resource._id,
-  });
+  await postRequest(
+    bot,
+    moduleInfo,
+    resource._id,
+    msg.photo !== undefined,
+    async () => {
+      await bot.api.copyMessages(reviewerId, moduleInfo.resourcesInputChatId!, [
+        file.telegramStoredMessageId!,
+      ]);
+    },
+  );
 }
