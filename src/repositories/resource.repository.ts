@@ -6,6 +6,7 @@ import { z } from "zod";
 export const resourceSchema = z.object({
   _id: z.instanceof(ObjectId),
   name: z.string(),
+  displayName: z.string().optional(),
   isApproved: z.boolean(),
   type: z.enum(["STUDY", "TIMETABLE"]),
   isMediaGroup: z.boolean(),

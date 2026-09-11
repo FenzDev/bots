@@ -15,22 +15,412 @@ import { generateTimestampId } from "../../utils/genid";
 import { TELEGRAM_SUPERADMIN_ID } from "../../config/env";
 import { ObjectId, WithId } from "mongodb";
 
+type PendingAdminBatch = {
+  messages: SupportedMessage[];
+  moduleName?: string;
+  customName?: string;
+  timer?: NodeJS.Timeout;
+};
+
+const ADMIN_BATCH_TIMEOUT_MS = 60_000;
+
+const pendingAdminBatches = new Map<string, PendingAdminBatch>();
+
 export default async (bot: Bot) => {
   bot.on("message:document", async (ctx, next) => {
-    await addFileAsRequest(bot, ctx, ctx.message);
+    if (ctx.from?.id === TELEGRAM_SUPERADMIN_ID) {
+      await addAdminFileToBatch(bot, ctx.message);
+    } else {
+      await addFileAsRequest(bot, ctx.message);
+    }
+
     return next();
   });
 
   bot.on("message:video", async (ctx, next) => {
-    await addFileAsRequest(bot, ctx, ctx.message);
+    if (ctx.from?.id === TELEGRAM_SUPERADMIN_ID) {
+      await addAdminFileToBatch(bot, ctx.message);
+    } else {
+      await addFileAsRequest(bot, ctx.message);
+    }
+
     return next();
   });
 
   bot.on("message:photo", async (ctx, next) => {
-    await addFileAsRequest(bot, ctx, ctx.message);
+    if (ctx.from?.id === TELEGRAM_SUPERADMIN_ID) {
+      await addAdminFileToBatch(bot, ctx.message);
+    } else {
+      await addFileAsRequest(bot, ctx.message);
+    }
+
+    return next();
+  });
+
+  bot.on("message:text", async (ctx, next) => {
+    if (ctx.from?.id === TELEGRAM_SUPERADMIN_ID) {
+      await handleAdminText(bot, ctx.message);
+    }
+
     return next();
   });
 };
+
+function parseAdminResourceText(text: string) {
+  const trimmed = text.trim();
+
+  if (trimmed.toLowerCase() === "cancel") {
+    return { type: "cancel" as const };
+  }
+
+  const match = trimmed.match(/^([^\s:]+)(?:\s*:\s*(.*))?$/);
+
+  if (!match) {
+    return null;
+  }
+
+  return {
+    type: "resource" as const,
+    moduleName: match[1],
+    customName: match[2]?.trim() || undefined,
+  };
+}
+
+function getAdminBatchKey(msg: Message) {
+  return `${msg.chat.id}:${msg.message_thread_id ?? "main"}`;
+}
+
+function resetAdminBatchTimer(
+  bot: Bot,
+  key: string,
+) {
+  const batch = pendingAdminBatches.get(key);
+
+  if (!batch) {
+    return;
+  }
+
+  if (batch.timer) {
+    clearTimeout(batch.timer);
+  }
+
+  batch.timer = setTimeout(async () => {
+    pendingAdminBatches.delete(key);
+
+    if (batch.messages.length === 0) {
+      return;
+    }
+
+    if (!batch.moduleName) {
+      console.warn(
+        `Admin batch ${key} expired without module name`,
+      );
+      return;
+    }
+
+    try {
+      await processAdminBatch(bot, batch);
+    } catch (error) {
+      logger.error(
+        error,
+        `Failed to process admin batch ${key}`,
+      );
+    }
+  }, ADMIN_BATCH_TIMEOUT_MS);
+}
+
+async function addAdminFileToBatch(
+  bot: Bot,
+  msg: SupportedMessage,
+) {
+  const key = getAdminBatchKey(msg);
+
+  let batch = pendingAdminBatches.get(key);
+
+  if (!batch) {
+    batch = {
+      messages: [],
+    };
+
+    pendingAdminBatches.set(key, batch);
+  }
+
+  batch.messages.push(msg);
+
+  resetAdminBatchTimer(bot, key);
+}
+
+function getAdminMetadataKey(msg: Message) {
+  return `${msg.chat.id}:${msg.message_thread_id ?? "main"}`;
+}
+
+async function handleAdminText(
+  bot: Bot,
+  msg: Message,
+) {
+  if (!msg.text) {
+    return;
+  }
+
+  const parsed = parseAdminResourceText(msg.text);
+
+  if (!parsed) {
+    return;
+  }
+
+  const key = getAdminBatchKey(msg);
+
+  if (parsed.type === "cancel") {
+    const existingBatch = pendingAdminBatches.get(key);
+
+    if (existingBatch?.timer) {
+      clearTimeout(existingBatch.timer);
+    }
+
+    pendingAdminBatches.delete(key);
+
+    return;
+  }
+
+  let batch = pendingAdminBatches.get(key);
+
+  if (!batch) {
+    batch = {
+      messages: [],
+    };
+
+    pendingAdminBatches.set(key, batch);
+  }
+
+  const moduleInfo = await resourcesModule.findModuleFromName(
+    parsed.moduleName,
+  );
+
+  if (!moduleInfo) {
+    console.warn(
+      `Admin specified unknown module: ${parsed.moduleName}`,
+    );
+
+    return;
+  }
+
+  batch.moduleName = parsed.moduleName;
+  batch.customName = parsed.customName;
+
+  /*
+   * If files are already waiting, the metadata completes
+   * the batch immediately.
+   */
+  if (batch.messages.length > 0) {
+    if (batch.timer) {
+      clearTimeout(batch.timer);
+    }
+
+    pendingAdminBatches.delete(key);
+
+    await processAdminBatch(bot, batch);
+
+    return;
+  }
+
+  /*
+   * Text came first.
+   *
+   * Wait up to one minute for files.
+   */
+  resetAdminBatchTimer(bot, key);
+}
+
+async function processAdminBatch(
+  bot: Bot,
+  batch: PendingAdminBatch,
+) {
+  if (!batch.moduleName) {
+    return;
+  }
+
+  const moduleInfo = await resourcesModule.findModuleFromName(
+    batch.moduleName,
+  );
+
+  if (!moduleInfo) {
+    return;
+  }
+
+  /*
+   * Group photos by media_group_id.
+   *
+   * Documents/videos are intentionally NOT grouped.
+   */
+  const photoGroups = new Map<string, SupportedMessage[]>();
+  const individualMessages: SupportedMessage[] = [];
+
+  for (const msg of batch.messages) {
+    if (msg.photo && msg.media_group_id) {
+      const existing = photoGroups.get(msg.media_group_id);
+
+      if (existing) {
+        existing.push(msg);
+      } else {
+        photoGroups.set(msg.media_group_id, [msg]);
+      }
+    } else {
+      individualMessages.push(msg);
+    }
+  }
+
+  /*
+   * Process photo albums.
+   */
+  for (const messages of photoGroups.values()) {
+    await processAdminPhotoGroup(
+      bot,
+      moduleInfo,
+      messages,
+      batch.customName,
+    );
+  }
+
+  /*
+   * Process documents, videos, and standalone photos
+   * individually.
+   */
+  for (const msg of individualMessages) {
+    await processAdminSingleMessage(
+      bot,
+      moduleInfo,
+      msg,
+      batch.customName,
+    );
+  }
+}
+
+async function processAdminPhotoGroup(
+  bot: Bot,
+  moduleInfo: ResourcesModule,
+  messages: SupportedMessage[],
+  customName?: string,
+) {
+  const resource = await resources.createResource({
+    name:
+      customName ??
+      `pending_${moduleInfo.semester}_${moduleInfo.name}_${generateTimestampId()}`,
+    type: "STUDY",
+    isApproved: false,
+    isMediaGroup: true,
+  });
+
+  for (const msg of messages) {
+    if (!msg.photo) {
+      continue;
+    }
+
+    const largestPhoto = msg.photo.at(-1)!;
+
+    await resourceFiles.addResourceFile({
+      resourceId: resource._id,
+      fileId: largestPhoto.file_id,
+      fileName: `photo_${generateTimestampId()}.jpg`,
+      mimeType: "image/jpeg",
+      telegramStoredMessageId: msg.message_id,
+      mediaGroupId: msg.media_group_id,
+    });
+  }
+
+  const reviewerId =
+    moduleInfo.reviewerId ?? TELEGRAM_SUPERADMIN_ID;
+
+  await postRequest(
+    bot,
+    moduleInfo,
+    resource._id,
+    true,
+    async () => {
+      await bot.api.forwardMessages(
+        reviewerId,
+        TELEGRAM_SUPERADMIN_ID,
+        messages.map((msg) => msg.message_id),
+      );
+    },
+  );
+}
+
+async function processAdminSingleMessage(
+  bot: Bot,
+  moduleInfo: ResourcesModule,
+  msg: SupportedMessage,
+  customName?: string,
+) {
+  const resource = await resources.createResource({
+    name:
+      customName ??
+      msg.document?.file_name ??
+      msg.video?.file_name ??
+      `pending_${moduleInfo.semester}_${moduleInfo.name}_${generateTimestampId()}`,
+    type: "STUDY",
+    isApproved: false,
+    isMediaGroup: false,
+  });
+
+  let file: ResourceFileInput | undefined;
+
+  if (msg.photo) {
+    const largestPhoto = msg.photo.at(-1)!;
+
+    file = {
+      resourceId: resource._id,
+      fileId: largestPhoto.file_id,
+      fileName: `photo_${generateTimestampId()}.jpg`,
+      mimeType: "image/jpeg",
+      telegramStoredMessageId: msg.message_id,
+    };
+  } else if (msg.video) {
+    file = {
+      resourceId: resource._id,
+      fileId: msg.video.file_id,
+      fileName:
+        msg.video.file_name ??
+        `video_${generateTimestampId()}.mp4`,
+      mimeType: msg.video.mime_type ?? "video/mp4",
+      telegramStoredMessageId: msg.message_id,
+    };
+  } else if (msg.document) {
+    file = {
+      resourceId: resource._id,
+      fileId: msg.document.file_id,
+      fileName:
+        msg.document.file_name ??
+        `file_${generateTimestampId()}`,
+      mimeType:
+        msg.document.mime_type ??
+        "application/octet-stream",
+      telegramStoredMessageId: msg.message_id,
+    };
+  }
+
+  if (!file) {
+    return;
+  }
+
+  await resourceFiles.addResourceFile(file);
+
+  const reviewerId =
+    moduleInfo.reviewerId ?? TELEGRAM_SUPERADMIN_ID;
+
+  await postRequest(
+    bot,
+    moduleInfo,
+    resource._id,
+    msg.photo !== undefined,
+    async () => {
+      await bot.api.copyMessages(
+        reviewerId,
+        TELEGRAM_SUPERADMIN_ID,
+        [msg.message_id],
+      );
+    },
+  );
+}
 
 type SupportedMessage =
   | (Message & Update.NonChannel & Record<"document" | "from", {}>)
@@ -46,17 +436,17 @@ function generateRequestInlineKeyboard(
   requestMessageId: string,
   allCopyableCommand: boolean,
 ) {
-  const commandBase = `/approve ${requestMessageId} res_${moduleInfo.semester}_${moduleInfo.name}_`;
+  const commandBase = `/approve ${requestMessageId} res_${moduleInfo.semester}_${moduleInfo.name}`;
   return allCopyableCommand
     ? new InlineKeyboard()
-        .copyText("TD", `${commandBase}td`)
-        .copyText("Lecture", `${commandBase}cours`)
-        .copyText("TP", `${commandBase}tp`)
+        .copyText("TD", `${commandBase}_td `)
+        .copyText("Lecture", `${commandBase}_cours `)
+        .copyText("TP", `${commandBase}_tp `)
         .row()
-        .copyText("Exercises & Exams", `${commandBase}exoexam`)
-        .copyText("Resume", `${commandBase}resume`)
+        .copyText("Exercises & Exams", `${commandBase}_exoexam `)
+        .copyText("Resume", `${commandBase}_resume `)
         .row()
-        .copyText("Other", commandBase)
+        .copyText("Other", `${commandBase} `)
         .text("❌ Ignore", "ignore")
     : new InlineKeyboard()
         .text("TD", `td:${requestMessageId}`)
@@ -67,7 +457,7 @@ function generateRequestInlineKeyboard(
         .row()
         .text("Resume", `resume:${requestMessageId}`)
         .row()
-        .copyText("Other", commandBase)
+        .copyText("Other", `${commandBase} `)
         .text("Ignore", "ignore");
 }
 
@@ -153,13 +543,12 @@ function scheduleMediaGroupProcessing(
   mediaGroupTimers.set(mediaGroupId, timer);
 }
 
-async function addFileAsRequest(bot: Bot, ctx: Context, msg: SupportedMessage) {
-  const moduleInfo = await resourcesModule.findModuleFromInputChat(
+async function addFileAsRequest(bot: Bot, msg: SupportedMessage) {
+  let moduleInfo = await resourcesModule.findModuleFromInputChat(
     msg.chat.id,
     msg.message_thread_id ?? null,
   );
 
-  // Ignore if this isn't one of our module resource chats.
   if (!moduleInfo) {
     return;
   }

@@ -32,6 +32,15 @@ export type ResourcesModule = ResourcesModuleInput & {
 
 const collection = db.collection<ResourcesModule>('modules');
 
+async function findModuleFromName(name:string) {
+  return collection.findOne(
+    {
+      name,
+    }
+  );
+}
+
+
 async function findModuleFromInputChat(chatId:number, threadId:number|null) {
   return collection.findOne(
     {
@@ -59,6 +68,7 @@ async function setModule(res:ResourcesModuleInput) {
 }
 
 export const resourcesModule = {
+  findModuleFromName,
   findModuleFromInputChat,
   setModule,
 };
