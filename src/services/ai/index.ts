@@ -6,13 +6,11 @@ import { AIApplication, AITextPart, AIToolCallPart } from "./types";
 
 import { prompts } from "./prompts/";
 import { GemmaProvider } from "./providers/google-ai-provider";
-import { TimetableCheckAIApp } from "./apps/timetablecheck";
 
 export const chillbotAIApp = new ChatbotAIApp(
   "chillbot",
   prompts["personalities/chillbot"],
 );
-export const timetableAIApp = new TimetableCheckAIApp();
 
 let currentProvider = new GemmaProvider();
 
