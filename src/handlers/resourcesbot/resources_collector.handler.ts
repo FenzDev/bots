@@ -197,7 +197,7 @@ async function handleAdminText(
   );
 
   if (!moduleInfo) {
-    console.warn(
+    logger.warn(
       `Admin specified unknown module: ${parsed.moduleName}`,
     );
 
