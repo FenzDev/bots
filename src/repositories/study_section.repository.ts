@@ -12,18 +12,20 @@ export const studySectionInputSchema = z
     displayShort: z.string().optional(),
     sectionLetter: z.string().optional(),
 
-    timetableBroadcastChatId: z.coerce.number().int().safe().optional(),
+    timetableStoargeChatId: z.coerce.number().optional(),
+    timetableStoargeThreadId: z
+      .union([z.literal("null").transform(() => null), z.coerce.number().int()])
+      .optional(),
 
+    timetableBroadcastChatId: z.coerce.number().int().optional(),
     timetableBroadcastThreadId: z
-      .union([
-        z.literal("null").transform(() => null),
-        z.coerce.number().int().safe(),
-      ])
+      .union([z.literal("null").transform(() => null), z.coerce.number().int()])
       .optional(),
 
     timetableGID: z.string().optional(),
     timetableCurrentHash: z.string().optional(),
     timetableCurrentGridJSON: z.string().optional(),
+    timetableStoredResourceName: z.string().optional(),
   })
   .strict();
 

@@ -233,6 +233,8 @@ cron.schedule(
 
           logger.debug("Broadcasting the update");
 
+          // TODO: export pdf, put it on storage chat and create resource
+
           const pdfUrl = `https://t.me/${TELEGRAM_TIMETABLEBOT_USERNAME}?start=${update.section.name}`;
           const sourceUrl = `${baseUrl}/edit?gid=${update.section.timetableGID}#gid=${update.section.timetableGID}`;
 
