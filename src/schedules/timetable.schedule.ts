@@ -1,7 +1,7 @@
 import cron from "node-cron";
 import logger from "../lib/logger";
 import { debugMode } from "../handlers/chillbot/commands/admin/dbg.handler";
-import { chillBot } from "../lib/bots";
+import { chillBot, resourcesBot } from "../lib/bots";
 import {
   StudySection,
   studySections,
@@ -21,6 +21,9 @@ import { normalizeGrid } from "../utils/timetable/normalizeGrid";
 import { parseTableGrid } from "../utils/timetable/parseTableGrid";
 import { compareTables, GroupsDiff } from "../utils/timetable/compareTables";
 import { parseTimetableObject } from "../utils/timetable/parseTimetableObject";
+import { Resource, resourceFiles, resources } from "../repositories/resource.repository";
+import { InputFile } from "grammy";
+import { downloadDocumentAndStoreResource } from "../services/resources/download-store";
 
 function hashText(text: string): string {
   return createHash("sha256").update(text, "utf8").digest("hex");
@@ -117,7 +120,9 @@ cron.schedule(
         let stableHash = newHash;
 
         while (true) {
-          await new Promise((resolve) => setTimeout(resolve, TIMETABLE_CHECK_SETTLEMENT_DELAY*1000));
+          await new Promise((resolve) =>
+            setTimeout(resolve, TIMETABLE_CHECK_SETTLEMENT_DELAY * 1000),
+          );
 
           const latestCSV = await downloadText(downloadUrl);
           const latestHash = hashText(latestCSV);
@@ -233,28 +238,50 @@ cron.schedule(
 
           logger.debug("Broadcasting the update");
 
-          // TODO: export pdf, put it on storage chat and create resource
+          const pdfResource = await downloadAndStorePdf(
+            update.section,
+            baseDownloadUrl,
+          );
 
-          const pdfUrl = `https://t.me/${TELEGRAM_TIMETABLEBOT_USERNAME}?start=${update.section.name}`;
+          // const pdfUrl = `https://t.me/${TELEGRAM_TIMETABLEBOT_USERNAME}?start=${update.section.name}`;
           const sourceUrl = `${baseUrl}/edit?gid=${update.section.timetableGID}#gid=${update.section.timetableGID}`;
 
-          await chillBot.api.sendMessage(
-            update.section.timetableBroadcastChatId!,
-            `
+          const text = `
 🚨📅 لقد تم تحديث جدول توقيت ${update.section.displayShort} 🚨!
 📅 Timetable of ${update.section.displayShort} was updated!
 
 ${diffResultToText(update.section, update.diffs)}
 
-[📄pdf](${escapeCommonMD(pdfUrl)}) [🔗source](${escapeCommonMD(sourceUrl)})`
+[🔗source](${escapeCommonMD(sourceUrl)})`
               .trim()
-              .replace(/([`#+\-=|{}.!])/g, "\\$1"),
+              .replace(/([`#+\-=|{}.!])/g, "\\$1");
+
+          if (pdfResource) {
+            const pdfResFile = (await resourceFiles.findResourceFiles(pdfResource._id))[0];
+            await chillBot.api.copyMessage(
+              update.section.timetableBroadcastChatId!,
+              pdfResource.telegramStoredChatId!,
+              pdfResFile.telegramStoredMessageId!,
+            {
+              caption: text,
+              show_caption_above_media: true,
+              parse_mode: "MarkdownV2",
+              message_thread_id:
+                update.section.timetableBroadcastThreadId ?? undefined,
+              },
+            );
+          } else {
+            await chillBot.api.sendMessage(
+              update.section.timetableBroadcastChatId!,
+              text,
             {
               parse_mode: "MarkdownV2",
               message_thread_id:
                 update.section.timetableBroadcastThreadId ?? undefined,
-            },
-          );
+              },
+            );
+            
+          }
 
           logger.debug("Broadcasted and changed hash and grid for that");
         }
@@ -274,18 +301,22 @@ function diffResultToText(section: StudySection, diffs: GroupsDiff[]) {
     .map((groupsDiff) => {
       const groups = groupsDiff.hasAllGroups
         ? `#${section.displayShort?.toLowerCase().replaceAll(" ", "\\_")} #section`
-        : groupsDiff.groups.map((g) => `#${section.sectionLetter?.toLowerCase() ?? 'g'}${g}`).join(" ");
+        : groupsDiff.groups
+            .map((g) => `#${section.sectionLetter?.toLowerCase() ?? "g"}${g}`)
+            .join(" ");
 
       const dayTime = `${groupsDiff.day} ${groupsDiff.startTime}`;
 
       const content = `${
-        groupsDiff.isPureAdd? '➕':
-        groupsDiff.isPureRemove? '➖':
-        '✏'
+        groupsDiff.isPureAdd ? "➕" : groupsDiff.isPureRemove ? "➖" : "✏"
       } ${groupsDiff.diff
         .map((d) => {
-          const [prefix,postfix] =
-            d.type === "add" ? ["*__","__*"] : d.type === "remove" ? ["~","~"] : ["",""];
+          const [prefix, postfix] =
+            d.type === "add"
+              ? ["*__", "__*"]
+              : d.type === "remove"
+                ? ["~", "~"]
+                : ["", ""];
           return `${prefix}${escapeCommonMD(d.text)}${postfix}`.trim();
         })
         .join(" ")}`;
@@ -295,6 +326,48 @@ function diffResultToText(section: StudySection, diffs: GroupsDiff[]) {
     .join("\n\n");
 }
 
-function escapeCommonMD(text:string) {
+function escapeCommonMD(text: string) {
   return text.replace(/([*~_\[\]\(\)\\])/g, "\\$1");
+}
+
+function formatAlgiersDate(date = new Date()): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Africa/Algiers",
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+
+  const values = Object.fromEntries(
+    parts.map(({ type, value }) => [type, value])
+  );
+
+  return `${values.day}${values.month}${values.hour}h`;
+}
+
+async function downloadAndStorePdf(
+  section: StudySection,
+  baseDownloadUrl: string,
+): Promise<Resource|undefined> {
+  if (!section.timetableStoargeChatId) return;
+
+  const fileName = `EDT_${formatAlgiersDate(new Date())}.pdf`;
+  const timetableResource = await downloadDocumentAndStoreResource(
+    `${baseDownloadUrl}?gid=${section.timetableGID}&format=pdf`,
+    {
+      chatId: section.timetableBroadcastChatId!,
+      threadId: section.timetableStoargeThreadId ?? null,
+      fileName,
+    },
+    {
+      name: `res_${section.name}_${fileName.toLowerCase()}`,
+      isApproved: true,
+      isMediaGroup: false,
+      type: 'TIMETABLE',
+      displayName: fileName,
+    },
+  )
+
+  return timetableResource;
 }

@@ -8,8 +8,12 @@ export const resourceSchema = z.object({
   name: z.string(),
   displayName: z.string().optional(),
   isApproved: z.boolean(),
-  type: z.enum(["STUDY", "TIMETABLE"]),
+  type: z.enum(["UNDEFINED", "STUDY", "TIMETABLE"]),
   isMediaGroup: z.boolean(),
+  telegramStoredChatId: z.coerce.number().optional(),
+  telegramStoredThreadId: z
+    .union([z.literal("null").transform(() => null), z.coerce.number().int()])
+    .optional(),
   insertedAt: z.date(),
 });
 
@@ -29,7 +33,7 @@ export const resourceFileSchema = z.object({
   fileId: z.string(),
   fileName: z.string(),
   mimeType: z.string(),
-  telegramStoredMessageId: z.number().optional(),
+  telegramStoredMessageId: z.coerce.number().optional(),
   insertedAt: z.date(),
 });
 
@@ -92,7 +96,9 @@ async function findResourcesByNamePrefix(prefix: string): Promise<Resource[]> {
 /**
  * Find resources by type.
  */
-async function findResourcesByType(type: ResourceInput['type']): Promise<Resource[]> {
+async function findResourcesByType(
+  type: ResourceInput["type"],
+): Promise<Resource[]> {
   return resourcesCollection.find({ type }).sort({ insertedAt: 1 }).toArray();
 }
 
