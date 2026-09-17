@@ -58,9 +58,9 @@ export default async (bot: Bot) => {
   });
 
   bot.on("message:text", async (ctx, next) => {
-    if (ctx.from?.id === TELEGRAM_SUPERADMIN_ID) {
+    if (ctx.chat.id === TELEGRAM_SUPERADMIN_ID) {
       await handleAdminText(bot, ctx.message);
-    }
+    } 
 
     return next();
   });
@@ -90,10 +90,7 @@ function getAdminBatchKey(msg: Message) {
   return `${msg.chat.id}:${msg.message_thread_id ?? "main"}`;
 }
 
-function resetAdminBatchTimer(
-  bot: Bot,
-  key: string,
-) {
+function resetAdminBatchTimer(bot: Bot, key: string) {
   const batch = pendingAdminBatches.get(key);
 
   if (!batch) {
@@ -112,27 +109,19 @@ function resetAdminBatchTimer(
     }
 
     if (!batch.moduleName) {
-      console.warn(
-        `Admin batch ${key} expired without module name`,
-      );
+      console.warn(`Admin batch ${key} expired without module name`);
       return;
     }
 
     try {
       await processAdminBatch(bot, batch);
     } catch (error) {
-      logger.error(
-        error,
-        `Failed to process admin batch ${key}`,
-      );
+      logger.error(error, `Failed to process admin batch ${key}`);
     }
   }, ADMIN_BATCH_TIMEOUT_MS);
 }
 
-async function addAdminFileToBatch(
-  bot: Bot,
-  msg: SupportedMessage,
-) {
+async function addAdminFileToBatch(bot: Bot, msg: SupportedMessage) {
   const key = getAdminBatchKey(msg);
 
   let batch = pendingAdminBatches.get(key);
@@ -154,10 +143,7 @@ function getAdminMetadataKey(msg: Message) {
   return `${msg.chat.id}:${msg.message_thread_id ?? "main"}`;
 }
 
-async function handleAdminText(
-  bot: Bot,
-  msg: Message,
-) {
+async function handleAdminText(bot: Bot, msg: Message) {
   if (!msg.text) {
     return;
   }
@@ -197,9 +183,7 @@ async function handleAdminText(
   );
 
   if (!moduleInfo) {
-    logger.warn(
-      `Admin specified unknown module: ${parsed.moduleName}`,
-    );
+    logger.warn(`Admin specified unknown module: ${parsed.moduleName}`);
 
     return;
   }
@@ -231,17 +215,12 @@ async function handleAdminText(
   resetAdminBatchTimer(bot, key);
 }
 
-async function processAdminBatch(
-  bot: Bot,
-  batch: PendingAdminBatch,
-) {
+async function processAdminBatch(bot: Bot, batch: PendingAdminBatch) {
   if (!batch.moduleName) {
     return;
   }
 
-  const moduleInfo = await resourcesModule.findModuleFromName(
-    batch.moduleName,
-  );
+  const moduleInfo = await resourcesModule.findModuleFromName(batch.moduleName);
 
   if (!moduleInfo) {
     return;
@@ -273,12 +252,7 @@ async function processAdminBatch(
    * Process photo albums.
    */
   for (const messages of photoGroups.values()) {
-    await processAdminPhotoGroup(
-      bot,
-      moduleInfo,
-      messages,
-      batch.customName,
-    );
+    await processAdminPhotoGroup(bot, moduleInfo, messages, batch.customName);
   }
 
   /*
@@ -286,12 +260,7 @@ async function processAdminBatch(
    * individually.
    */
   for (const msg of individualMessages) {
-    await processAdminSingleMessage(
-      bot,
-      moduleInfo,
-      msg,
-      batch.customName,
-    );
+    await processAdminSingleMessage(bot, moduleInfo, msg, batch.customName);
   }
 }
 
@@ -327,22 +296,15 @@ async function processAdminPhotoGroup(
     });
   }
 
-  const reviewerId =
-    moduleInfo.reviewerId ?? TELEGRAM_SUPERADMIN_ID;
+  const reviewerId = moduleInfo.reviewerId ?? TELEGRAM_SUPERADMIN_ID;
 
-  await postRequest(
-    bot,
-    moduleInfo,
-    resource._id,
-    true,
-    async () => {
-      await bot.api.forwardMessages(
-        reviewerId,
-        TELEGRAM_SUPERADMIN_ID,
-        messages.map((msg) => msg.message_id),
-      );
-    },
-  );
+  await postRequest(bot, moduleInfo, resource._id, true, async () => {
+    await bot.api.forwardMessages(
+      reviewerId,
+      TELEGRAM_SUPERADMIN_ID,
+      messages.map((msg) => msg.message_id),
+    );
+  });
 }
 
 async function processAdminSingleMessage(
@@ -378,9 +340,7 @@ async function processAdminSingleMessage(
     file = {
       resourceId: resource._id,
       fileId: msg.video.file_id,
-      fileName:
-        msg.video.file_name ??
-        `video_${generateTimestampId()}.mp4`,
+      fileName: msg.video.file_name ?? `video_${generateTimestampId()}.mp4`,
       mimeType: msg.video.mime_type ?? "video/mp4",
       telegramStoredMessageId: msg.message_id,
     };
@@ -388,12 +348,8 @@ async function processAdminSingleMessage(
     file = {
       resourceId: resource._id,
       fileId: msg.document.file_id,
-      fileName:
-        msg.document.file_name ??
-        `file_${generateTimestampId()}`,
-      mimeType:
-        msg.document.mime_type ??
-        "application/octet-stream",
+      fileName: msg.document.file_name ?? `file_${generateTimestampId()}`,
+      mimeType: msg.document.mime_type ?? "application/octet-stream",
       telegramStoredMessageId: msg.message_id,
     };
   }
@@ -404,8 +360,7 @@ async function processAdminSingleMessage(
 
   await resourceFiles.addResourceFile(file);
 
-  const reviewerId =
-    moduleInfo.reviewerId ?? TELEGRAM_SUPERADMIN_ID;
+  const reviewerId = moduleInfo.reviewerId ?? TELEGRAM_SUPERADMIN_ID;
 
   await postRequest(
     bot,
@@ -413,11 +368,9 @@ async function processAdminSingleMessage(
     resource._id,
     msg.photo !== undefined,
     async () => {
-      await bot.api.copyMessages(
-        reviewerId,
-        TELEGRAM_SUPERADMIN_ID,
-        [msg.message_id],
-      );
+      await bot.api.copyMessages(reviewerId, TELEGRAM_SUPERADMIN_ID, [
+        msg.message_id,
+      ]);
     },
   );
 }

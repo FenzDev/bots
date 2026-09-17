@@ -369,5 +369,10 @@ async function downloadAndStorePdf(
     },
   )
 
+  studySections.setStudySection({
+    name: section.name,
+    timetableLastStoredResourceName: timetableResource.name,
+  })
+
   return timetableResource;
 }

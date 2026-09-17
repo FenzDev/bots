@@ -2,7 +2,7 @@ import { Bot } from "grammy";
 import logger from "../../lib/logger";
 
 export default async (bot: Bot) => {
-  await await bot.api.setMyCommands(
+  await bot.api.setMyCommands(
     [
       {
         command: "edt",
