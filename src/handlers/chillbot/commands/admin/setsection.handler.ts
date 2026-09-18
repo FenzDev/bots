@@ -17,6 +17,7 @@ const SECTION_FIELDS_HELP = [
   "`timetableBroadcastThreadId` — Telegram thread ID or `null`",
   "`timetableGID` — Timetable Google ID",
   "`timetableCurrentHash` — Current timetable hash",
+  "`telegramChatId` — Telegram general chat ID",
 ].join("\n");
 
 export default async (bot: Bot) => {

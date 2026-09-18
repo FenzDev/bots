@@ -26,6 +26,8 @@ export const studySectionInputSchema = z
     timetableCurrentHash: z.string().optional(),
     timetableCurrentGridJSON: z.string().optional(),
     timetableLastStoredResourceName: z.string().optional(),
+
+    telegramChatId: z.coerce.number().int().optional(),
   })
   .strict();
 
@@ -60,18 +62,32 @@ async function findStudySectionByName(name: string) {
     { name },
     {
       projection: {
-        timetableCurrentCSV: 0,
+        timetable: 0,
       },
     },
   );
 }
 
+async function findStudySectionsByChat(chatId: number) {
+  return await collection.find(
+    { telegramChatId: chatId, },
+    {
+      projection: {
+        timetableCurrentGridJSON: 0,
+      },
+    },
+  ).toArray();
+}
+
 async function getAllStudySections() {
-  return collection.find().toArray();
+  return collection.find({},{projection: {
+    timetableCurrentGridJSON: 0,
+  }}).toArray();
 }
 
 export const studySections = {
   setStudySection,
   findStudySectionByName,
+  findStudySectionsByChat,
   getAllStudySections,
 };
