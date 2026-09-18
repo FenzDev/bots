@@ -80,9 +80,7 @@ async function findStudySectionsByChat(chatId: number) {
 }
 
 async function getAllStudySections() {
-  return collection.find({},{projection: {
-    timetableCurrentGridJSON: 0,
-  }}).toArray();
+  return collection.find().toArray();
 }
 
 export const studySections = {

@@ -178,6 +178,8 @@ cron.schedule(
         );
 
         for (const timetable of updatedTimetables) {
+          // TODO : set other name field of section repo for html
+          // incase section.name is not same as one in gsheets
           const htmlFile = htmls.find(
             (h) => h.sourceFile === `${timetable.section.name}.html`,
           );
@@ -352,7 +354,9 @@ async function downloadAndStorePdf(
 ): Promise<Resource|undefined> {
   if (!section.timetableStoargeChatId) return;
 
-  const fileName = `EDT_${formatAlgiersDate(new Date())}.pdf`;
+  const timestamp = formatAlgiersDate(new Date());
+  const fileName = `EDT_${section.displayShort?.replaceAll(' ','')}_${timestamp}.pdf`;
+  const resourceFileName = `edt_${timestamp}`;
   const timetableResource = await downloadDocumentAndStoreResource(
     `${baseDownloadUrl}?gid=${section.timetableGID}&format=pdf`,
     {
