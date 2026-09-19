@@ -1,3 +1,4 @@
+import { mkdirSync } from "fs";
 import sharp from "sharp";
 
 function escapeXml(text: string) {
@@ -20,7 +21,8 @@ export async function addTextToTimetableImage(
     fileNameSuffix = title.toLowerCase().replaceAll(" ", "_");
   }
 
-  const outputPath = `media/timetable-${fileNameSuffix}.png`;
+  mkdirSync(`media/.tmp`);
+  const outputPath = `media/.tmp/timetable-${fileNameSuffix}.png`;
 
   const metadata = await sharp(inputPath).metadata();
 
