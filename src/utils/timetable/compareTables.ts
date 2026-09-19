@@ -76,10 +76,10 @@ export function compareTables(timetableA: Timetable, timetableB: Timetable) {
   // sort diffs pure-removes -> pure-aditions -> mix
   const sortEval = (gDiff: GroupsDiff) =>
     (gDiff.isPureRemove = gDiff.diff.every((d) => d.type === "remove"))
-      ? -1
+      ? 0
       : (gDiff.isPureAdd = gDiff.diff.every((d) => d.type === "add"))
-        ? 1
-        : 2;
+        ? 2
+        : 1;
   diffs.sort((a, b) => sortEval(a) - sortEval(b));
 
   return diffs;

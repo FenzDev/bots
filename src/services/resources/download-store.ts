@@ -14,7 +14,7 @@ export async function downloadDocumentAndStoreResource(
     fileName: string;
     chatId: number;
     threadId: number | null;
-    previewUrl?: string;
+    previewFile?: InputFile;
   },
   resourceOther?: ResourceInput,
 ): Promise<Resource> {
@@ -22,9 +22,7 @@ export async function downloadDocumentAndStoreResource(
     storageOptions.chatId,
     new InputFile(new URL(resourceFileDownloadUrl), storageOptions.fileName),
     {
-      thumbnail: storageOptions.previewUrl
-        ? new InputFile(new URL(storageOptions.previewUrl))
-        : undefined,
+      thumbnail: storageOptions.previewFile,
       message_thread_id: storageOptions.threadId ?? undefined,
     },
   );
@@ -35,6 +33,7 @@ export async function downloadDocumentAndStoreResource(
     type: "UNDEFINED",
     ...resourceOther,
     name: resourceOther?.name ?? `res_undefined_${generateTimestampId()}`,
+    displayName: storageOptions.fileName,
     telegramStoredChatId: storageOptions.chatId,
     telegramStoredThreadId: storageOptions.threadId,
   });

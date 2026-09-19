@@ -31,9 +31,9 @@ export async function addTextToTimetableImage(
   // SUBTITLE — top of image
   // -------------------------
 
-  const topPadding = 0;
+  const topPadding = 4;
 
-  let subtitleFontSize = 48;
+  let subtitleFontSize = 32;
 
   while (
     subtitle.length * subtitleFontSize * 0.55 > width - 30 &&
@@ -71,7 +71,7 @@ export async function addTextToTimetableImage(
         x="${width / 2}"
         y="${topPadding + subtitleFontSize}"
         text-anchor="middle"
-        font-family="Arial"
+        font-family="Liberation Mono"
         font-size="${subtitleFontSize}px"
         font-weight="bold"
         fill="black"
@@ -86,7 +86,9 @@ export async function addTextToTimetableImage(
         width="${boxWidth}"
         height="${boxHeight}"
         rx="10"
-        fill="black"
+        fill="#52a7d8"
+        stroke="black"
+        stroke-width="6"
       />
 
       <!-- Title -->
@@ -94,10 +96,10 @@ export async function addTextToTimetableImage(
         x="${width / 2}"
         y="${boxY + boxHeight / 2 + titleFontSize / 3}"
         text-anchor="middle"
-        font-family="Arial"
+        font-family="DejaVu Sans"
         font-size="${titleFontSize}px"
         font-weight="bold"
-        fill="white"
+        fill="black"
       >
         ${escapedTitle}
       </text>

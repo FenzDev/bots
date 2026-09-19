@@ -25,6 +25,7 @@ import { Resource, resourceFiles, resources } from "../repositories/resource.rep
 import { InputFile } from "grammy";
 import { downloadDocumentAndStoreResource } from "../services/resources/download-store";
 import { addTextToTimetableImage } from "../utils/image/addTextToTimetableImage";
+import { generateTimestampId } from "../utils/genid";
 
 function hashText(text: string): string {
   return createHash("sha256").update(text, "utf8").digest("hex");
@@ -299,7 +300,7 @@ ${diffResultToText(update.section, update.diffs)}
 );
 
 function diffResultToText(section: StudySection, diffs: GroupsDiff[]) {
-  logger.debug({ diffs, section }, "generating ai result string");
+  // logger.debug({ diffs, section }, "generating diff result string");
   return diffs
     .map((groupsDiff) => {
       const groups = groupsDiff.hasAllGroups
@@ -357,14 +358,15 @@ async function downloadAndStorePdf(
 
   const timestamp = formatAlgiersDate(new Date());
   const fileName = `EDT_${section.displayShort?.replaceAll(' ','')}_${timestamp}.pdf`;
-  const resourceFileName = `edt_${timestamp}`;
-  // const previewImg = section.displayShort? await addTextToTimetableImage(section.displayShort, timestamp, section.name): undefined;
+  const resourceFileName = `edt_${timestamp}_${generateTimestampId()}`;
+  const previewImg = section.displayShort? await addTextToTimetableImage(section.displayShort, timestamp, section.name): undefined;
   const timetableResource = await downloadDocumentAndStoreResource(
     `${baseDownloadUrl}?gid=${section.timetableGID}&format=pdf`,
     {
       chatId: section.timetableBroadcastChatId!,
       threadId: section.timetableStoargeThreadId ?? null,
       fileName,
+      previewFile: previewImg? new InputFile(previewImg): undefined,
     },
     {
       name: `res_${section.name}_${resourceFileName.toLowerCase()}`,
