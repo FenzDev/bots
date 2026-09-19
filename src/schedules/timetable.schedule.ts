@@ -24,6 +24,7 @@ import { parseTimetableObject } from "../utils/timetable/parseTimetableObject";
 import { Resource, resourceFiles, resources } from "../repositories/resource.repository";
 import { InputFile } from "grammy";
 import { downloadDocumentAndStoreResource } from "../services/resources/download-store";
+import { addTextToTimetableImage } from "../utils/image/addTextToTimetableImage";
 
 function hashText(text: string): string {
   return createHash("sha256").update(text, "utf8").digest("hex");
@@ -357,6 +358,7 @@ async function downloadAndStorePdf(
   const timestamp = formatAlgiersDate(new Date());
   const fileName = `EDT_${section.displayShort?.replaceAll(' ','')}_${timestamp}.pdf`;
   const resourceFileName = `edt_${timestamp}`;
+  // const previewImg = section.displayShort? await addTextToTimetableImage(section.displayShort, timestamp, section.name): undefined;
   const timetableResource = await downloadDocumentAndStoreResource(
     `${baseDownloadUrl}?gid=${section.timetableGID}&format=pdf`,
     {
@@ -365,7 +367,7 @@ async function downloadAndStorePdf(
       fileName,
     },
     {
-      name: `res_${section.name}_${fileName.toLowerCase()}`,
+      name: `res_${section.name}_${resourceFileName.toLowerCase()}`,
       isApproved: true,
       isMediaGroup: false,
       type: 'TIMETABLE',

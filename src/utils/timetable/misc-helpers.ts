@@ -1,5 +1,3 @@
-import { TimetableCheckAIResult } from "../../services/ai/apps/timetablecheck";
-
 export function normalizeText(value: string | null | undefined): string {
   return (value ?? "")
     .trim()
@@ -27,8 +25,21 @@ export function sameGroups(a: string[], b: string[]): boolean {
   );
 }
 
-type GroupsInvolved = TimetableCheckAIResult['changesFromAtoB']['0']['groupsInvolved'];
+// type GroupsInvolved = [
+//   "G1",
+//   "G2",
+//   "G3",
+//   "G4",
+//   "G5",
+//   "G6",
+//   "G7",
+//   "G8",
+//   "G9",
+//   "G10",
+//   "G11",
+//   "G12",
+// ]
 
-export function mergeGroups(a: GroupsInvolved, b: GroupsInvolved): GroupsInvolved {
-  return [...new Set([...a, ...b])];
-}
+// export function mergeGroups(a: GroupsInvolved, b: GroupsInvolved): GroupsInvolved {
+//   return [...new Set([...a, ...b])];
+// }

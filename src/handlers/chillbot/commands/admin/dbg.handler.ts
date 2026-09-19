@@ -22,6 +22,7 @@ export default async (bot: Bot) => {
       debugMode = !debugMode;
       logger.debug(`Debugging mode -> ${debugMode}`);
 
+
       return next();
     });
 };
