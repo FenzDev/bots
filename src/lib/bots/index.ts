@@ -67,3 +67,11 @@ export async function handleBots(
     logger.error({ err }, `${name} handlers were not loaded.`);
   }
 }
+
+export async function forEachBot(
+  hookFunc: (bot: Bot, botName: string, token: string) => void,
+) {
+  botHandlers.forEach(([botName, bot]) => {
+    hookFunc(bot, botName, bot.token);
+  });
+}
