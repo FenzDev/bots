@@ -1,5 +1,5 @@
 import z from "zod";
-import { db } from "../lib/mongodb";
+import { db } from "../lib/mongodb.js";
 
 export const resourcesModuleInputSchema = z
   .object({

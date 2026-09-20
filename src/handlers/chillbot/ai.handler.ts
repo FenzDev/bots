@@ -1,10 +1,10 @@
 import { Bot } from "grammy";
-import { TELEGRAM_SUPERADMIN_ID } from "../../config/env";
-import { chillbotAIApp, runAIApp } from "../../services/ai";
-import { prompts } from "../../services/ai/prompts";
-import { dbMessageFromTelegramMessage } from "../../helpers/db-msg-from-telegram";
-import { trackedScopes } from "../../repositories/tracked_scope.repository";
-import { replyToMessage } from "../../helpers/reply-to-message";
+import { TELEGRAM_SUPERADMIN_ID } from "../../config/env.js";
+import { chillbotAIApp, runAIApp } from "../../services/ai.js";
+import { prompts } from "../../services/ai/prompts.js";
+import { dbMessageFromTelegramMessage } from "../../helpers/db-msg-from-telegram.js";
+import { trackedScopes } from "../../repositories/tracked_scope.repository.js";
+import { replyToMessage } from "../../helpers/reply-to-message.js";
 
 export default async (bot: Bot) => {
 

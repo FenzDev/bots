@@ -1,6 +1,6 @@
-import logger from "../../lib/logger";
-import { DiffPart, diffWords } from "./diffwords";
-import { Timetable } from "./parseTimetableObject";
+import logger from "../../lib/logger.js";
+import { DiffPart, diffWords } from "./diffwords.js";
+import { Timetable } from "./parseTimetableObject.js";
 
 export type GroupsDiff = {
   groups: number[];

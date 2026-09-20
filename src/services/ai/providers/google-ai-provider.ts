@@ -10,10 +10,10 @@ import {
   type AIResponsePart,
   type AIProviderState,
   type JSONValue,
-} from "../types";
+} from "../types.js";
 
-import { GOOGLE_AI_API_KEY } from "../../../config/env";
-import logger from "../../../lib/logger";
+import { GOOGLE_AI_API_KEY } from "../../../config/env.js";
+import logger from "../../../lib/logger.js";
 
 type GemmaState = {
   interactionId: string;

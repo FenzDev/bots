@@ -1,10 +1,10 @@
 import { Bot, InputFile } from "grammy";
-import { TELEGRAM_SUPERADMIN_ID } from "../../../../config/env";
-import logger from "../../../../lib/logger";
-import { GemmaProvider } from "../../../../services/ai/providers/google-ai-provider";
+import { TELEGRAM_SUPERADMIN_ID } from "../../../../config/env.js";
+import logger from "../../../../lib/logger.js";
+import { GemmaProvider } from "../../../../services/ai/providers/google-ai-provider.js";
 import sharp from "sharp";
-import { addTextToTimetableImage } from "../../../../utils/image/addTextToTimetableImage";
-import { generateTimestampId } from "../../../../utils/genid";
+import { addTextToTimetableImage } from "../../../../utils/image/addTextToTimetableImage.js";
+import { generateTimestampId } from "../../../../utils/genid.js";
 
 export default async (bot: Bot) => {
   const ai = new GemmaProvider();

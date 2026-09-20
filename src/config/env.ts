@@ -1,7 +1,7 @@
 import z from "zod";
-import logger from "../lib/logger";
+import logger from "../lib/logger.js";
 import { configDotenv } from "dotenv";
-import { cronSchema, telegramTargetSchema } from "./schemas";
+import { cronSchema, telegramTargetSchema } from "./schemas.js";
 
 configDotenv({ quiet: true });
 

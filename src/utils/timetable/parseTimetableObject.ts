@@ -1,6 +1,6 @@
 import { string } from "zod";
-import { normalizeTimeString, tryNormalizeDayString } from "./normalizeStrings";
-import { TableGrid } from "./parseTableGrid";
+import { normalizeTimeString, tryNormalizeDayString } from "./normalizeStrings.js";
+import { TableGrid } from "./parseTableGrid.js";
 
 export type Timetable = Record<string, string[]>;
 

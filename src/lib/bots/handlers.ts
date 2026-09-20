@@ -7,7 +7,7 @@ import { pathToFileURL } from "node:url";
 import type { Bot } from "grammy";
 import { z } from "zod";
 
-import logger from "../logger";
+import logger from "../logger.js";
 
 type BotHandler = (bot: Bot) => void | Promise<void>;
 

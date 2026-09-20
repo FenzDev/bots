@@ -1,5 +1,5 @@
 import express from 'express';
-import { TELEGRAM_WEBHOOK_SECRET } from '../../config/env';
+import { TELEGRAM_WEBHOOK_SECRET } from '../../config/env.js';
 
 export function verifyWebhookSecret() {
   return (

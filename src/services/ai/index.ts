@@ -1,11 +1,11 @@
 import type { z } from "zod";
 
-import { ChatbotAIApp } from "./apps/chatbot/";
+import { ChatbotAIApp } from "./apps/chatbot/index.js";
 
-import { AIApplication, AITextPart, AIToolCallPart } from "./types";
+import { AIApplication, AITextPart, AIToolCallPart } from "./types.js";
 
-import { prompts } from "./prompts/";
-import { GemmaProvider } from "./providers/google-ai-provider";
+import { prompts } from "./prompts/index.js";
+import { GemmaProvider } from "./providers/google-ai-provider.js";
 
 export const chillbotAIApp = new ChatbotAIApp(
   "chillbot",

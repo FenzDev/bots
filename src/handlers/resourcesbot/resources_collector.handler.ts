@@ -1,18 +1,18 @@
 import { Bot, Context, InlineKeyboard, InputMediaBuilder } from "grammy";
 import { InlineKeyboardMarkup, Message, Update } from "grammy/types";
-import logger from "../../lib/logger";
+import logger from "../../lib/logger.js";
 import {
   ResourcesModule,
   resourcesModule,
-} from "../../repositories/module.repository";
+} from "../../repositories/module.repository.js";
 import {
   ResourceFileInput,
   resourceFiles,
   resources,
-} from "../../repositories/resource.repository";
-import { pendings } from "../../repositories/pending.repository";
-import { generateTimestampId } from "../../utils/genid";
-import { TELEGRAM_SUPERADMIN_ID } from "../../config/env";
+} from "../../repositories/resource.repository.js";
+import { pendings } from "../../repositories/pending.repository.js";
+import { generateTimestampId } from "../../utils/genid.js";
+import { TELEGRAM_SUPERADMIN_ID } from "../../config/env.js";
 import { ObjectId, WithId } from "mongodb";
 
 type PendingAdminBatch = {

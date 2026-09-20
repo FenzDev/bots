@@ -1,6 +1,6 @@
 import { Bot } from "grammy";
-import { TELEGRAM_SUPERADMIN_ID } from "../../../../config/env";
-import logger from "../../../../lib/logger";
+import { TELEGRAM_SUPERADMIN_ID } from "../../../../config/env.js";
+import logger from "../../../../lib/logger.js";
 
 export default async (bot: Bot) => {
   bot

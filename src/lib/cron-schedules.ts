@@ -2,7 +2,7 @@ import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import logger from "./logger";
+import logger from "./logger.js";
 
 async function loadSchedules(schedulesDirectory: string): Promise<number> {
   const entries = await readdir(schedulesDirectory, {

@@ -1,12 +1,12 @@
 import { InputFile } from "grammy";
-import { resourcesBot } from "../../lib/bots";
+import { resourcesBot } from "../../lib/bots.js";
 import {
   Resource,
   resourceFiles,
   ResourceInput,
   resources,
-} from "../../repositories/resource.repository";
-import { generateTimestampId } from "../../utils/genid";
+} from "../../repositories/resource.repository.js";
+import { generateTimestampId } from "../../utils/genid.js";
 
 export async function downloadDocumentAndStoreResource(
   resourceFileDownloadUrl: string,

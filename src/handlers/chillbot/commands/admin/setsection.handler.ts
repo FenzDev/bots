@@ -1,11 +1,11 @@
 import { Bot } from "grammy";
-import { TELEGRAM_SUPERADMIN_ID } from "../../../../config/env";
+import { TELEGRAM_SUPERADMIN_ID } from "../../../../config/env.js";
 import {
   studySectionInputSchema,
   studySections,
-} from "../../../../repositories/study_section.repository";
-import { replyToMessage } from "../../../../helpers/reply-to-message";
-import { parseKeyValueInput } from "../../../../utils/parse_key_value";
+} from "../../../../repositories/study_section.repository.js";
+import { replyToMessage } from "../../../../helpers/reply-to-message.js";
+import { parseKeyValueInput } from "../../../../utils/parse_key_value.js";
 
 const SECTION_FIELDS_HELP = [
   "`name` — Required section name",

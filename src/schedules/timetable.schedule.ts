@@ -1,31 +1,31 @@
 import cron from "node-cron";
-import logger from "../lib/logger";
-import { debugMode } from "../handlers/chillbot/commands/admin/dbg.handler";
-import { chillBot, resourcesBot } from "../lib/bots";
+import logger from "../lib/logger.js";
+import { debugMode } from "../handlers/chillbot/commands/admin/dbg.handler.js";
+import { chillBot, resourcesBot } from "../lib/bots/index.js";
 import {
   StudySection,
   studySections,
-} from "../repositories/study_section.repository";
-import { downloadBuffer, downloadText } from "../utils/download";
-import { runtimeConfig } from "../repositories/runtime_config.repository";
+} from "../repositories/study_section.repository.js";
+import { downloadBuffer, downloadText } from "../utils/download.js";
+import { runtimeConfig } from "../repositories/runtime_config.repository.js";
 import { createHash } from "crypto";
 import {
   TELEGRAM_TIMETABLEBOT_USERNAME,
   TIMETABLE_CHECK_SCHEDULE,
   TIMETABLE_CHECK_SETTLEMENT_DELAY,
-} from "../config/env";
-import { unzipHtmlFiles } from "../utils/timetable/unzipHtml";
-import { extractTables } from "../utils/timetable/extractTables";
-import { cleanTable } from "../utils/timetable/cleanTable";
-import { normalizeGrid } from "../utils/timetable/normalizeGrid";
-import { parseTableGrid } from "../utils/timetable/parseTableGrid";
-import { compareTables, GroupsDiff } from "../utils/timetable/compareTables";
-import { parseTimetableObject } from "../utils/timetable/parseTimetableObject";
-import { Resource, resourceFiles, resources } from "../repositories/resource.repository";
+} from "../config/env.js";
+import { unzipHtmlFiles } from "../utils/timetable/unzipHtml.js";
+import { extractTables } from "../utils/timetable/extractTables.js";
+import { cleanTable } from "../utils/timetable/cleanTable.js";
+import { normalizeGrid } from "../utils/timetable/normalizeGrid.js";
+import { parseTableGrid } from "../utils/timetable/parseTableGrid.js";
+import { compareTables, GroupsDiff } from "../utils/timetable/compareTables.js";
+import { parseTimetableObject } from "../utils/timetable/parseTimetableObject.js";
+import { Resource, resourceFiles, resources } from "../repositories/resource.repository.js";
 import { InputFile } from "grammy";
-import { downloadDocumentAndStoreResource } from "../services/resources/download-store";
-import { addTextToTimetableImage } from "../utils/image/addTextToTimetableImage";
-import { generateTimestampId } from "../utils/genid";
+import { downloadDocumentAndStoreResource } from "../services/resources/download-store.js";
+import { addTextToTimetableImage } from "../utils/image/addTextToTimetableImage.js";
+import { generateTimestampId } from "../utils/genid.js";
 
 function hashText(text: string): string {
   return createHash("sha256").update(text, "utf8").digest("hex");

@@ -1,14 +1,14 @@
 import { Bot, Context, InlineKeyboard, NextFunction } from "grammy";
-import { replyToMessage } from "../../../helpers/reply-to-message";
+import { replyToMessage } from "../../../helpers/reply-to-message.js";
 import {
   StudySection,
   studySections,
-} from "../../../repositories/study_section.repository";
+} from "../../../repositories/study_section.repository.js";
 import {
   resourceFiles,
   resources,
-} from "../../../repositories/resource.repository";
-import logger from "../../../lib/logger";
+} from "../../../repositories/resource.repository.js";
+import logger from "../../../lib/logger.js";
 import { InlineKeyboardButton } from "grammy/types";
 
 export default async (bot: Bot) => {

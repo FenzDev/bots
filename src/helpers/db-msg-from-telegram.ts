@@ -8,7 +8,7 @@ import type {
   PollMessage,
   TextMessage,
   VoiceMessage,
-} from "../repositories/message.repository";
+} from "../repositories/message.repository.js";
 
 import type { Message, User } from "grammy/types";
 

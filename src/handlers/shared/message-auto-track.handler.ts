@@ -1,15 +1,15 @@
 import { Bot, RawApi } from "grammy";
-import { dbMessageFromTelegramMessage } from "../../helpers/db-msg-from-telegram";
+import { dbMessageFromTelegramMessage } from "../../helpers/db-msg-from-telegram.js";
 import { ApiMethods, Message, User } from "grammy/types";
 import {
   Scope,
   trackedScopes,
-} from "../../repositories/tracked_scope.repository";
+} from "../../repositories/tracked_scope.repository.js";
 import {
   Message as DbMessage,
   messages,
-} from "../../repositories/message.repository";
-import { users } from "../../repositories/user.repository";
+} from "../../repositories/message.repository.js";
+import { users } from "../../repositories/user.repository.js";
 
 export async function trackMessage(
   message: DbMessage,

@@ -1,5 +1,5 @@
 import { Bot } from "grammy";
-import logger from "../../lib/logger";
+import logger from "../../lib/logger.js";
 
 export default async (bot: Bot) => {
   await bot.api.setMyCommands(

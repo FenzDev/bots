@@ -1,5 +1,5 @@
 import { ObjectId } from "mongodb";
-import { db } from "../lib/mongodb";
+import { db } from "../lib/mongodb.js";
 
 import { z } from "zod";
 

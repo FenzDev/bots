@@ -1,8 +1,8 @@
 import { Bot } from "grammy";
-import { TELEGRAM_SUPERADMIN_ID } from "../../../../config/env";
-import { replyToMessage } from "../../../../helpers/reply-to-message";
-import { parseKeyValueInput } from "../../../../utils/parse_key_value";
-import { resourcesModule, resourcesModuleInputSchema } from "../../../../repositories/module.repository";
+import { TELEGRAM_SUPERADMIN_ID } from "../../../../config/env.js";
+import { replyToMessage } from "../../../../helpers/reply-to-message.js";
+import { parseKeyValueInput } from "../../../../utils/parse_key_value.js";
+import { resourcesModule, resourcesModuleInputSchema } from "../../../../repositories/module.repository.js";
 
 const RESOURCES_MODULE_FIELDS_HELP = [
 "`name` — Required resource module name",

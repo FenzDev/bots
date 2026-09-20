@@ -1,5 +1,5 @@
 import z from "zod";
-import { AITool, JSONValue } from "./types";
+import { AITool, JSONValue } from "./types.js";
 
 export function defineTool<TContext,TSchema extends z.ZodTypeAny>(tool: {
   name: string;

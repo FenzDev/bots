@@ -1,4 +1,4 @@
-import { loadHandlers } from "./handlers";
+import { loadHandlers } from "./handlers.js";
 
 import { Bot } from "grammy";
 import {
@@ -6,8 +6,8 @@ import {
   TELEGRAM_GUARDBOT_TOKEN,
   TELEGRAM_RESOURCESBOT_TOKEN,
   TELEGRAM_TIMETABLEBOT_TOKEN,
-} from "../../config/env";
-import logger from "../logger";
+} from "../../config/env.js";
+import logger from "../logger.js";
 import { fileURLToPath } from "url";
 
 export const chillBot = new Bot(TELEGRAM_CHILLBOT_TOKEN);

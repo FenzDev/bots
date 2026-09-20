@@ -7,12 +7,12 @@ import {
   AITool,
   AIToolCall,
   JSONValue,
-} from "../../types";
-import { getMoreMessagesTool } from "./tools";
-import { Message, messages } from "../../../../repositories/message.repository";
-import { User, users } from "../../../../repositories/user.repository";
-import logger from "../../../../lib/logger";
-import { TELEGRAM_SUPERADMIN_ID } from "../../../../config/env";
+} from "../../types.js";
+import { getMoreMessagesTool } from "./tools.js";
+import { Message, messages } from "../../../../repositories/message.repository.js";
+import { User, users } from "../../../../repositories/user.repository.js";
+import logger from "../../../../lib/logger.js";
+import { TELEGRAM_SUPERADMIN_ID } from "../../../../config/env.js";
 
 const chatbotAIResultSchema = z.object({
   replies: z.array(
