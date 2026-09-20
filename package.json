@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/copy-assets.mjs",
     "dev": "cross-env NODE_ENV=development tsx watch src/index.ts",
     "start": "cross-env NODE_ENV=production node dist/index.js",
     "typecheck": "tsc --noEmit",
