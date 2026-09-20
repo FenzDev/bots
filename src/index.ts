@@ -25,6 +25,8 @@ const ALLOWED_UPDATES = [
 async function runServer() {
   const app = express();
 
+  app.use(express.json())
+
   // Healthcheck
   app.get("/", (_, res) => {
     res.send("Bot is alive!");
