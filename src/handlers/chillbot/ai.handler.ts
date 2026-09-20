@@ -1,7 +1,7 @@
 import { Bot } from "grammy";
 import { TELEGRAM_SUPERADMIN_ID } from "../../config/env.js";
-import { chillbotAIApp, runAIApp } from "../../services/ai.js";
-import { prompts } from "../../services/ai/prompts.js";
+import { chillbotAIApp, runAIApp } from "../../services/ai/index.js";
+import { prompts } from "../../services/ai/prompts/index.js";
 import { dbMessageFromTelegramMessage } from "../../helpers/db-msg-from-telegram.js";
 import { trackedScopes } from "../../repositories/tracked_scope.repository.js";
 import { replyToMessage } from "../../helpers/reply-to-message.js";

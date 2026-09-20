@@ -1,5 +1,5 @@
 import { InputFile } from "grammy";
-import { resourcesBot } from "../../lib/bots.js";
+import { resourcesBot } from "../../lib/bots/index.js";
 import {
   Resource,
   resourceFiles,

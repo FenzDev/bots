@@ -2,7 +2,7 @@ import z from "zod";
 import { AITool } from "../../types.js";
 import { messages } from "../../../../repositories/message.repository.js";
 import { defineTool } from "../../define-tool.js";
-import { ChatbotAIContext } from ".";
+import { ChatbotAIContext } from "./index.js";
 import { users } from "../../../../repositories/user.repository.js";
 
 export const getMoreMessagesTool = defineTool({
