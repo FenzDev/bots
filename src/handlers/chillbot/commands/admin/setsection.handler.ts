@@ -31,7 +31,7 @@ export default async (bot: Bot) => {
         return next();
       }
 
-      studySections.setStudySection(result);
+      await studySections.setStudySection(result);
 
       await replyToMessage(ctx, `Study section was added to db!\n\`\`\`json\n${JSON.stringify(result)}\`\`\``, {parse_mode:'Markdown'})
 

@@ -127,7 +127,7 @@ export async function checkTimetables({
 
   // Check for any update.
   for (const section of sections) {
-    if (!section.timetableBroadcastChatId) continue;
+    if (!forceSilentUpdate && !section.timetableBroadcastChatId) continue;
 
     const downloadUrl = `${baseDownloadUrl}?gid=${section.timetableGID}&format=csv`;
     const downloadedTimetableCSV = await downloadText(downloadUrl);
@@ -143,7 +143,7 @@ export async function checkTimetables({
 
     // IMPORTANT:
     // Mark this hash as seen immediately after it has stabilized.
-    studySections.setStudySection({
+    await studySections.setStudySection({
       name: section.name,
       timetableCurrentHash: stableHash ?? newHash,
     });
@@ -156,7 +156,7 @@ export async function checkTimetables({
 
   // For each stable update, download the HTML and analyse diffs
   // to determine the actual differences.
-  if (!forceSilentUpdate && updatedTimetables.length > 0) {
+  if (updatedTimetables.length > 0) {
     const zipBuffer = await downloadBuffer(`${baseDownloadUrl}?format=zip`);
 
     const htmls = await parseTimetableZip(
@@ -184,12 +184,16 @@ export async function checkTimetables({
 
       timetable.newGridJSON = JSON.stringify(htmlFile.grid);
 
-      if (!timetable.section.timetableCurrentGridJSON) {
-        // No previous grid to compare against.
-        studySections.setStudySection({
+      if (forceSilentUpdate || !timetable.section.timetableCurrentGridJSON) {
+        // Silent update / No previous grid to compare against.
+        await studySections.setStudySection({
           name: timetable.section.name,
           timetableCurrentHash: timetable.newHash,
           timetableCurrentGridJSON: timetable.newGridJSON,
+          timetableLastStoredResourceName: await downloadAndStoreEdtPdf(
+            timetable.section,
+            baseDownloadUrl,
+          ).then((res) => res?.name),
         });
 
         continue;
@@ -209,7 +213,7 @@ export async function checkTimetables({
       timetable.diffs = compareTables(timetableA, timetableB);
 
       // Persist the stable hash/grid only after the debounce + comparison.
-      studySections.setStudySection({
+      await studySections.setStudySection({
         name: timetable.section.name,
         timetableCurrentHash: timetable.newHash,
         timetableCurrentGridJSON: timetable.newGridJSON,
@@ -273,10 +277,6 @@ ${diffResultToText(update.section, update.diffs)}
       }
 
       logger.debug("Broadcasted and changed hash and grid for that");
-    }
-  } else if (forceSilentUpdate) {
-    for (const section of sections) {
-      await downloadAndStoreEdtPdf(section, baseDownloadUrl);
     }
   }
 }
@@ -378,7 +378,7 @@ function formatAlgiersDate(date = new Date()): string {
     parts.map(({ type, value }) => [type, value]),
   );
 
-  return `${values.day}${values.month}${values.hour}h`;
+  return `${values.day} ${values.month} ${values.hour}h`;
 }
 
 async function downloadAndStoreEdtPdf(
@@ -388,8 +388,9 @@ async function downloadAndStoreEdtPdf(
   if (!section.timetableStoargeChatId) return;
 
   const timestamp = formatAlgiersDate(new Date());
-  const fileName = `EDT_${section.displayShort?.replaceAll(" ", "")}_${timestamp}.pdf`;
-  const resourceFileName = `edt_${timestamp}_${generateTimestampId()}`;
+  const timestampNoSpaces = timestamp.replaceAll(' ','')
+  const fileName = `EDT_${section.displayShort?.replaceAll(" ", "") ?? section.name} (${timestampNoSpaces}).pdf`;
+  const resourceFileName = `edt_${timestampNoSpaces}_${generateTimestampId()}`;
   const previewImg = section.displayShort
     ? await addTextToTimetableImage(
         section.displayShort,
@@ -400,7 +401,7 @@ async function downloadAndStoreEdtPdf(
   const timetableResource = await downloadDocumentAndStoreResource(
     `${baseDownloadUrl}?gid=${section.timetableGID}&format=pdf`,
     {
-      chatId: section.timetableBroadcastChatId!,
+      chatId: section.timetableStoargeChatId!,
       threadId: section.timetableStoargeThreadId ?? null,
       fileName,
       previewFile: previewImg ? new InputFile(previewImg) : undefined,
@@ -414,7 +415,7 @@ async function downloadAndStoreEdtPdf(
     },
   );
 
-  studySections.setStudySection({
+  await studySections.setStudySection({
     name: section.name,
     timetableLastStoredResourceName: timetableResource.name,
   });
