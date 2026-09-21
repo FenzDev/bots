@@ -21,7 +21,7 @@ export async function addTextToTimetableImage(
     fileNameSuffix = title.toLowerCase().replaceAll(" ", "_");
   }
 
-  mkdirSync(`media/.tmp`);
+  mkdirSync(`media/.tmp`, {recursive:true});
   const outputPath = `media/.tmp/timetable-${fileNameSuffix}.png`;
 
   const metadata = await sharp(inputPath).metadata();
