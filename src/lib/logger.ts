@@ -11,6 +11,7 @@ export default pino({
       colorize: true,
       ...(isDevelopment && {
         translateTime: "SYS:standard",
+        ignore: isDevelopment ? undefined : "time",
       }),
     },
   },
