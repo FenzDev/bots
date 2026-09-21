@@ -58,13 +58,13 @@ async function runServer() {
         allowed_updates: ALLOWED_UPDATES,
       });
 
-      logger.info(
-        {
-          botName,
-          webhookUrl,
-        },
-        "Telegram webhook configured",
-      );
+      // logger.info(
+      //   {
+      //     botName,
+      //     webhookUrl,
+      //   },
+      //   "Telegram webhook configured",
+      // );
     });
   } catch (err) {
     logger.error(err, "Failed to configure Telegram webhooks");

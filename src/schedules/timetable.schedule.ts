@@ -21,11 +21,36 @@ import { normalizeGrid } from "../utils/timetable/normalizeGrid.js";
 import { parseTableGrid } from "../utils/timetable/parseTableGrid.js";
 import { compareTables, GroupsDiff } from "../utils/timetable/compareTables.js";
 import { parseTimetableObject } from "../utils/timetable/parseTimetableObject.js";
-import { Resource, resourceFiles, resources } from "../repositories/resource.repository.js";
+import {
+  Resource,
+  resourceFiles,
+  resources,
+} from "../repositories/resource.repository.js";
 import { InputFile } from "grammy";
 import { downloadDocumentAndStoreResource } from "../services/resources/download-store.js";
 import { addTextToTimetableImage } from "../utils/image/addTextToTimetableImage.js";
 import { generateTimestampId } from "../utils/genid.js";
+import { WithId } from "mongodb";
+
+cron.schedule(
+  TIMETABLE_CHECK_SCHEDULE,
+  async () => {
+    if (timetableCheckRunning) {
+      logger.warn(
+        "New timetable check schedule was interrupted because one is still running.",
+      );
+      return;
+    }
+    try {
+      await checkTimetables({});
+    } catch (err) {
+      logger.error(err, "Error while checking timetable updates.");
+    } finally {
+      timetableCheckRunning = false;
+    }
+  },
+  { logger },
+);
 
 function hashText(text: string): string {
   return createHash("sha256").update(text, "utf8").digest("hex");
@@ -70,234 +95,240 @@ async function parseTimetableZip(
 
 let timetableCheckRunning = false;
 
-cron.schedule(
-  TIMETABLE_CHECK_SCHEDULE,
-  async () => {
-    if (timetableCheckRunning) {
-      logger.warn(
-        "New timetable check schedule was interrupted because one is still running.",
+export async function checkTimetables({
+  forceSilentUpdate,
+  specificSections,
+}: {
+  forceSilentUpdate?: boolean;
+  specificSections?: WithId<StudySection>[];
+}) {
+  timetableCheckRunning = true;
+
+  if (debugMode) {
+    return;
+  }
+
+  const sections = specificSections
+    ? specificSections
+    : await studySections.getAllStudySections();
+
+  type SectionUpdate = {
+    section: StudySection;
+    newHash: string;
+    newGridJSON?: string;
+    diffs?: GroupsDiff[];
+  };
+
+  const updatedTimetables: SectionUpdate[] = [];
+
+  const { timetablesId } = await runtimeConfig.get();
+  const baseUrl = `https://docs.google.com/spreadsheets/d/${timetablesId}`;
+  const baseDownloadUrl = `${baseUrl}/export`;
+
+  // Check for any update.
+  for (const section of sections) {
+    if (!section.timetableBroadcastChatId) continue;
+
+    const downloadUrl = `${baseDownloadUrl}?gid=${section.timetableGID}&format=csv`;
+    const downloadedTimetableCSV = await downloadText(downloadUrl);
+
+    const newHash = hashText(downloadedTimetableCSV);
+
+    let stableHash;
+    if (
+      !forceSilentUpdate &&
+      !(stableHash = await checkCSV(section, downloadUrl, newHash))
+    )
+      continue;
+
+    // IMPORTANT:
+    // Mark this hash as seen immediately after it has stabilized.
+    studySections.setStudySection({
+      name: section.name,
+      timetableCurrentHash: stableHash ?? newHash,
+    });
+
+    updatedTimetables.push({
+      section,
+      newHash: stableHash ?? newHash,
+    });
+  }
+
+  // For each stable update, download the HTML and analyse diffs
+  // to determine the actual differences.
+  if (!forceSilentUpdate && updatedTimetables.length > 0) {
+    const zipBuffer = await downloadBuffer(`${baseDownloadUrl}?format=zip`);
+
+    const htmls = await parseTimetableZip(
+      zipBuffer,
+      (fileName) =>
+        updatedTimetables.findIndex(
+          (t) => `${t.section.name}.html` === fileName,
+        ) >= 0,
+    );
+
+    for (const timetable of updatedTimetables) {
+      // TODO : set other name field of section repo for html
+      // incase section.name is not same as one in gsheets
+      const htmlFile = htmls.find(
+        (h) => h.sourceFile === `${timetable.section.name}.html`,
       );
-      return;
-    }
-    try {
-      timetableCheckRunning = true;
 
-      if (debugMode) {
-        return;
+      if (!htmlFile) {
+        throw new Error("The section name is not equivalent to any html file");
       }
 
-      const sections = await studySections.getAllStudySections();
+      if (!htmlFile.grid) {
+        throw new Error("The grid wasn't properly parsed.");
+      }
 
-      type SectionUpdate = {
-        section: StudySection;
-        newHash: string;
-        newGridJSON?: string;
-        diffs?: GroupsDiff[];
-      };
+      timetable.newGridJSON = JSON.stringify(htmlFile.grid);
 
-      const updatedTimetables: SectionUpdate[] = [];
-
-      const { timetablesId } = await runtimeConfig.get();
-      const baseUrl = `https://docs.google.com/spreadsheets/d/${timetablesId}`;
-      const baseDownloadUrl = `${baseUrl}/export`;
-
-      // Check for any update.
-      for (const section of sections) {
-        if (!section.timetableBroadcastChatId) continue;
-
-        const downloadUrl = `${baseDownloadUrl}?gid=${section.timetableGID}&format=csv`;
-        const downloadedTimetableCSV = await downloadText(downloadUrl);
-
-        const newHash = hashText(downloadedTimetableCSV);
-
-        if (newHash === section.timetableCurrentHash) {
-          continue;
-        }
-
-        logger.debug(
-          { section: section.name },
-          "Different Timetable is detected, waiting for changes to settle.",
-        );
-
-        let stableHash = newHash;
-
-        while (true) {
-          await new Promise((resolve) =>
-            setTimeout(resolve, TIMETABLE_CHECK_SETTLEMENT_DELAY * 1000),
-          );
-
-          const latestCSV = await downloadText(downloadUrl);
-          const latestHash = hashText(latestCSV);
-
-          if (latestHash === stableHash) {
-            logger.debug(
-              {
-                section: section.name,
-                hash: stableHash,
-              },
-              "Timetable has stopped changing.",
-            );
-
-            break;
-          }
-
-          logger.debug(
-            {
-              section: section.name,
-              previousHash: stableHash,
-              newHash: latestHash,
-            },
-            "Timetable changed again while waiting, continuing debounce.",
-          );
-
-          stableHash = latestHash;
-        }
-
-        // IMPORTANT:
-        // Mark this hash as seen immediately after it has stabilized.
+      if (!timetable.section.timetableCurrentGridJSON) {
+        // No previous grid to compare against.
         studySections.setStudySection({
-          name: section.name,
-          timetableCurrentHash: stableHash,
+          name: timetable.section.name,
+          timetableCurrentHash: timetable.newHash,
+          timetableCurrentGridJSON: timetable.newGridJSON,
         });
 
-        updatedTimetables.push({
-          section,
-          newHash: stableHash,
-        });
+        continue;
       }
 
-      // For each stable update, download the HTML and analyse diffs
-      // to determine the actual differences.
-      if (updatedTimetables.length > 0) {
-        const zipBuffer = await downloadBuffer(`${baseDownloadUrl}?format=zip`);
+      // parse grids into objects
+      const timetableA = parseTimetableObject(
+        JSON.parse(timetable.section.timetableCurrentGridJSON),
+      );
+      const timetableB = parseTimetableObject(htmlFile.grid);
 
-        const htmls = await parseTimetableZip(
-          zipBuffer,
-          (fileName) =>
-            updatedTimetables.findIndex(
-              (t) => `${t.section.name}.html` === fileName,
-            ) >= 0,
-        );
+      if (!timetableA || !timetableB) {
+        throw new Error("Timetable grids are unparssable probally devs fault");
+      }
 
-        for (const timetable of updatedTimetables) {
-          // TODO : set other name field of section repo for html
-          // incase section.name is not same as one in gsheets
-          const htmlFile = htmls.find(
-            (h) => h.sourceFile === `${timetable.section.name}.html`,
-          );
+      // Get the diffs
+      timetable.diffs = compareTables(timetableA, timetableB);
 
-          if (!htmlFile) {
-            throw new Error(
-              "The section name is not equivalent to any html file",
-            );
-          }
+      // Persist the stable hash/grid only after the debounce + comparison.
+      studySections.setStudySection({
+        name: timetable.section.name,
+        timetableCurrentHash: timetable.newHash,
+        timetableCurrentGridJSON: timetable.newGridJSON,
+      });
+    }
 
-          if (!htmlFile.grid) {
-            throw new Error("The grid wasn't properly parsed.");
-          }
+    let update: SectionUpdate | undefined;
 
-          timetable.newGridJSON = JSON.stringify(htmlFile.grid);
+    while ((update = updatedTimetables.shift())) {
+      if (!update.diffs?.length) {
+        logger.debug("No realistic differences in any session.");
+        continue;
+      }
 
-          if (!timetable.section.timetableCurrentGridJSON) {
-            // No previous grid to compare against.
-            studySections.setStudySection({
-              name: timetable.section.name,
-              timetableCurrentHash: timetable.newHash,
-              timetableCurrentGridJSON: timetable.newGridJSON,
-            });
+      logger.debug("Broadcasting the update");
 
-            continue;
-          }
+      const pdfResource = await downloadAndStoreEdtPdf(
+        update.section,
+        baseDownloadUrl,
+      );
 
-          // parse grids into objects
-          const timetableA = parseTimetableObject(
-            JSON.parse(timetable.section.timetableCurrentGridJSON),
-          );
-          const timetableB = parseTimetableObject(htmlFile.grid);
+      // const pdfUrl = `https://t.me/${TELEGRAM_TIMETABLEBOT_USERNAME}?start=${update.section.name}`;
+      const sourceUrl = `${baseUrl}/edit?gid=${update.section.timetableGID}#gid=${update.section.timetableGID}`;
 
-          if (!timetableA || !timetableB) {
-            throw new Error(
-              "Timetable grids are unparssable probally devs fault",
-            );
-          }
-
-          // Get the diffs
-          timetable.diffs = compareTables(timetableA, timetableB);
-
-          // Persist the stable hash/grid only after the debounce + comparison.
-          studySections.setStudySection({
-            name: timetable.section.name,
-            timetableCurrentHash: timetable.newHash,
-            timetableCurrentGridJSON: timetable.newGridJSON,
-          });
-        }
-
-        let update: SectionUpdate | undefined;
-
-        while ((update = updatedTimetables.shift())) {
-          if (!update.diffs?.length) {
-            logger.debug("No realistic differences in any session.");
-            continue;
-          }
-
-          logger.debug("Broadcasting the update");
-
-          const pdfResource = await downloadAndStorePdf(
-            update.section,
-            baseDownloadUrl,
-          );
-
-          // const pdfUrl = `https://t.me/${TELEGRAM_TIMETABLEBOT_USERNAME}?start=${update.section.name}`;
-          const sourceUrl = `${baseUrl}/edit?gid=${update.section.timetableGID}#gid=${update.section.timetableGID}`;
-
-          const text = `
+      const text = `
 🚨📅 لقد تم تحديث جدول توقيت ${update.section.displayShort} 🚨!
 📅 Timetable of ${update.section.displayShort} was updated!
 
 ${diffResultToText(update.section, update.diffs)}
 
 [🔗source](${escapeCommonMD(sourceUrl)})`
-              .trim()
-              .replace(/([`#+\-=|{}.!])/g, "\\$1");
+        .trim()
+        .replace(/([`#+\-=|{}.!])/g, "\\$1");
 
-          if (pdfResource) {
-            const pdfResFile = (await resourceFiles.findResourceFiles(pdfResource._id))[0];
-            await chillBot.api.copyMessage(
-              update.section.timetableBroadcastChatId!,
-              pdfResource.telegramStoredChatId!,
-              pdfResFile.telegramStoredMessageId!,
-            {
-              caption: text,
-              show_caption_above_media: true,
-              parse_mode: "MarkdownV2",
-              message_thread_id:
-                update.section.timetableBroadcastThreadId ?? undefined,
-              },
-            );
-          } else {
-            await chillBot.api.sendMessage(
-              update.section.timetableBroadcastChatId!,
-              text,
-            {
-              parse_mode: "MarkdownV2",
-              message_thread_id:
-                update.section.timetableBroadcastThreadId ?? undefined,
-              },
-            );
-            
-          }
-
-          logger.debug("Broadcasted and changed hash and grid for that");
-        }
+      if (pdfResource) {
+        const pdfResFile = (
+          await resourceFiles.findResourceFiles(pdfResource._id)
+        )[0];
+        await chillBot.api.copyMessage(
+          update.section.timetableBroadcastChatId!,
+          pdfResource.telegramStoredChatId!,
+          pdfResFile.telegramStoredMessageId!,
+          {
+            caption: text,
+            show_caption_above_media: true,
+            parse_mode: "MarkdownV2",
+            message_thread_id:
+              update.section.timetableBroadcastThreadId ?? undefined,
+          },
+        );
+      } else {
+        await chillBot.api.sendMessage(
+          update.section.timetableBroadcastChatId!,
+          text,
+          {
+            parse_mode: "MarkdownV2",
+            message_thread_id:
+              update.section.timetableBroadcastThreadId ?? undefined,
+          },
+        );
       }
-    } catch (err) {
-      logger.error(err, "Error while checking timetable updates.");
-    } finally {
-      timetableCheckRunning = false;
+
+      logger.debug("Broadcasted and changed hash and grid for that");
     }
-  },
-  { logger },
-);
+  } else if (forceSilentUpdate) {
+    for (const section of sections) {
+      await downloadAndStoreEdtPdf(section, baseDownloadUrl);
+    }
+  }
+}
+
+async function checkCSV(
+  section: StudySection,
+  downloadUrl: string,
+  newHash: string,
+) {
+  if (newHash === section.timetableCurrentHash) {
+    return null;
+  }
+
+  logger.debug(
+    { section: section.name },
+    "Different Timetable is detected, waiting for changes to settle.",
+  );
+
+  let stableHash = newHash;
+
+  while (true) {
+    await new Promise((resolve) =>
+      setTimeout(resolve, TIMETABLE_CHECK_SETTLEMENT_DELAY * 1000),
+    );
+
+    const latestCSV = await downloadText(downloadUrl);
+    const latestHash = hashText(latestCSV);
+
+    if (latestHash === stableHash) {
+      logger.debug(
+        {
+          section: section.name,
+          hash: stableHash,
+        },
+        "Timetable has stopped changing.",
+      );
+
+      break;
+    }
+
+    logger.debug(
+      {
+        section: section.name,
+        previousHash: stableHash,
+        newHash: latestHash,
+      },
+      "Timetable changed again while waiting, continuing debounce.",
+    );
+
+    return (stableHash = latestHash);
+  }
+}
 
 function diffResultToText(section: StudySection, diffs: GroupsDiff[]) {
   // logger.debug({ diffs, section }, "generating diff result string");
@@ -344,43 +375,49 @@ function formatAlgiersDate(date = new Date()): string {
   }).formatToParts(date);
 
   const values = Object.fromEntries(
-    parts.map(({ type, value }) => [type, value])
+    parts.map(({ type, value }) => [type, value]),
   );
 
   return `${values.day}${values.month}${values.hour}h`;
 }
 
-async function downloadAndStorePdf(
+async function downloadAndStoreEdtPdf(
   section: StudySection,
   baseDownloadUrl: string,
-): Promise<Resource|undefined> {
+): Promise<Resource | undefined> {
   if (!section.timetableStoargeChatId) return;
 
   const timestamp = formatAlgiersDate(new Date());
-  const fileName = `EDT_${section.displayShort?.replaceAll(' ','')}_${timestamp}.pdf`;
+  const fileName = `EDT_${section.displayShort?.replaceAll(" ", "")}_${timestamp}.pdf`;
   const resourceFileName = `edt_${timestamp}_${generateTimestampId()}`;
-  const previewImg = section.displayShort? await addTextToTimetableImage(section.displayShort, timestamp, section.name): undefined;
+  const previewImg = section.displayShort
+    ? await addTextToTimetableImage(
+        section.displayShort,
+        timestamp,
+        section.name,
+      )
+    : undefined;
   const timetableResource = await downloadDocumentAndStoreResource(
     `${baseDownloadUrl}?gid=${section.timetableGID}&format=pdf`,
     {
       chatId: section.timetableBroadcastChatId!,
       threadId: section.timetableStoargeThreadId ?? null,
       fileName,
-      previewFile: previewImg? new InputFile(previewImg): undefined,
+      previewFile: previewImg ? new InputFile(previewImg) : undefined,
     },
     {
       name: `res_${section.name}_${resourceFileName.toLowerCase()}`,
       isApproved: true,
       isMediaGroup: false,
-      type: 'TIMETABLE',
+      type: "TIMETABLE",
       displayName: fileName,
     },
-  )
+  );
 
   studySections.setStudySection({
     name: section.name,
     timetableLastStoredResourceName: timetableResource.name,
-  })
+  });
 
   return timetableResource;
 }
