@@ -42,6 +42,7 @@ cron.schedule(
       return;
     }
     try {
+      timetableCheckRunning = true;
       await checkTimetables({});
     } catch (err) {
       logger.error(err, "Error while checking timetable updates.");
@@ -102,7 +103,6 @@ export async function checkTimetables({
   forceSilentUpdate?: boolean;
   specificSections?: WithId<StudySection>[];
 }) {
-  timetableCheckRunning = true;
 
   if (debugMode) {
     return;
