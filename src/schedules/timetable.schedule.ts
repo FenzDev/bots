@@ -28,7 +28,7 @@ import {
 } from "../repositories/resource.repository.js";
 import { InputFile } from "grammy";
 import { downloadDocumentAndStoreResource } from "../services/resources/download-store.js";
-import { addTextToTimetableImage } from "../utils/image/addTextToTimetableImage.js";
+import { addTextToTimetableImage } from "../services/image/addTextToTimetableImage.js";
 import { generateTimestampId } from "../utils/genid.js";
 import { WithId } from "mongodb";
 

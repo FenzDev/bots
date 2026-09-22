@@ -11,7 +11,7 @@ import { chillBot, handleBots, forEachBot } from "./lib/bots/index.js";
 import { Bot, webhookCallback } from "grammy";
 import { connectDatabase } from "./lib/mongodb.js";
 import { handleSchedules } from "./lib/cron-schedules.js";
-import { verifyWebhookSecret } from "./utils/server/verifyWebhookSecret.js";
+import { verifyWebhookSecret } from "./services/server/verifyWebhookSecret.js";
 
 const ALLOWED_UPDATES = [
   "message",
