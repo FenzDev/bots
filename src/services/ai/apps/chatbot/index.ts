@@ -12,7 +12,7 @@ import { getMoreMessagesTool } from "./tools.js";
 import { Message, messages } from "../../../../repositories/message.repository.js";
 import { User, users } from "../../../../repositories/user.repository.js";
 import logger from "../../../../lib/logger.js";
-import { TELEGRAM_SUPERADMIN_ID } from "../../../../config/env.js";
+import { NODE_ENV, TELEGRAM_SUPERADMIN_ID } from "../../../../config/env.js";
 
 const chatbotAIResultSchema = z.object({
   replies: z.array(
@@ -190,7 +190,7 @@ export class ChatbotAIApp implements AIApplication<
     };
 
     return {
-      useHighThinking: true,
+      useHighThinking: NODE_ENV === 'production',
       parts: [
         {
           role: "system",
