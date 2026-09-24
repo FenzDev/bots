@@ -11,7 +11,8 @@ export default async (bot: Bot) => {
   bot
     .on("message::mention", async (ctx, next) => {
       const botUsername = ctx.me.username;
-
+      // TODO : TEMP 
+      return next(); 
       if (
         !(await trackedScopes.exists({
           chatId: ctx.chatId,
