@@ -6,6 +6,7 @@ import {
   formatTomorrowWeather,
 } from "./formatter.js";
 import { WeatherLocation } from "./types.js";
+import logger from "../../lib/logger.js";
 
 export async function broadcastWeatherTomorrow(
   bot: Bot,
@@ -40,9 +41,9 @@ async function sendToAllChats(
         parse_mode: "HTML",
       });
     } catch (error) {
-      console.error(
-        `Failed to send weather to chat ${0}:`,
+      logger.error(
         error,
+        `Failed to send weather to chat.`,
       );
     }
 }

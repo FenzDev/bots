@@ -5,6 +5,7 @@ import { db } from "../lib/mongodb.js";
 export type RuntimeConfig = {
   _id: "global";
   timetablesId: string;
+  weatherForcastChannelId: number;
 };
 
 export type RuntimeConfigInput = Omit<RuntimeConfig, "_id">;
@@ -22,6 +23,7 @@ async function get(): Promise<RuntimeConfig> {
   const defaultConfig: RuntimeConfig = {
     _id: "global",
     timetablesId: "",
+    weatherForcastChannelId: 0,
   };
 
   await collection.insertOne(defaultConfig);
