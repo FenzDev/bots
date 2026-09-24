@@ -21,7 +21,7 @@ export default async (bot: Bot) => {
     )
       return next();
 
-    await replyAIToUser(ctx);
+    replyAIToUser(ctx);
 
     return next();
   });
@@ -55,38 +55,45 @@ export default async (bot: Bot) => {
       return next();
     }
 
-    await replyAIToUser(ctx);
+    replyAIToUser(ctx);
 
     return next();
   });
 
   async function replyAIToUser(ctx: Context) {
-    if (!ctx.chat || !ctx.message) return;
+    try {
+      if (!ctx.chat || !ctx.message) return;
 
-    logger.info(ctx.message,'Reply to ChillBot is detected AI response on the way:');
+      logger.info(
+        ctx.message,
+        "Reply to ChillBot is detected AI response on the way:",
+      );
 
-    await runAIApp(
-      chillbotAIApp,
-      {
-        botId: ctx.me.id,
-        mentions: [dbMessageFromTelegramMessage(ctx.message)],
-        chatId: ctx.chat!.id,
-        threadId: ctx.message?.message_thread_id ?? null,
-      },
-      prompts["instructions/chillbot/replyToMentions"],
-      async (res) => {
-        if (typeof res === "string") {
-          await replyToMessage(ctx, res);
-        } else {
-          for (const reply of res.replies) {
-            await ctx.api.sendMessage(ctx.chat!.id, reply.text, {
-              reply_parameters: { message_id: reply.replyTo },
-              message_thread_id: ctx.message!.message_thread_id,
-            });
+      await runAIApp(
+        chillbotAIApp,
+        {
+          botId: ctx.me.id,
+          mentions: [dbMessageFromTelegramMessage(ctx.message)],
+          chatId: ctx.chat!.id,
+          threadId: ctx.message?.message_thread_id ?? null,
+        },
+        prompts["instructions/chillbot/replyToMentions"],
+        async (res) => {
+          if (typeof res === "string") {
+            await replyToMessage(ctx, res);
+          } else {
+            for (const reply of res.replies) {
+              await ctx.api.sendMessage(ctx.chat!.id, reply.text, {
+                reply_parameters: { message_id: reply.replyTo },
+                message_thread_id: ctx.message!.message_thread_id,
+              });
+            }
           }
-        }
-      },
-    );
-    logger.info(ctx.message, 'AI responded.');
+        },
+      );
+      logger.info(ctx.message, "AI responded.");
+    } catch (err) {
+      logger.error(err);
+    }
   }
 };
