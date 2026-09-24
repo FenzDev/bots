@@ -11,15 +11,21 @@ export default async (bot: Bot) => {
   bot.on("message", async (ctx, next) => {
     const botId = ctx.me.id;
 
+    logger.debug(ctx, "tfo");
+
     if (
       !ctx.message.reply_to_message ||
       ctx.message.reply_to_message.from?.id !== botId ||
       !(await trackedScopes.exists({
         chatId: ctx.chatId,
-        threadId: ctx.message.message_thread_id ?? null,
+        threadId: ctx.message.is_topic_message
+          ? (ctx.message.message_thread_id ?? null)
+          : null,
       }))
     )
       return next();
+
+    logger.debug("tfo yep replied to bot");
 
     replyAIToUser(ctx);
 
@@ -27,14 +33,19 @@ export default async (bot: Bot) => {
   });
 
   bot.on("message::mention", async (ctx, next) => {
+    logger.debug("mention boi");
     if (
       ctx.message.reply_to_message?.from?.id === ctx.me.id || // ignore reply
       !(await trackedScopes.exists({
         chatId: ctx.chatId,
-        threadId: ctx.message.message_thread_id ?? null,
+        threadId: ctx.message.is_topic_message
+          ? (ctx.message.message_thread_id ?? null)
+          : null,
       }))
     )
       return next();
+
+    logger.debug("yep mention boi");
 
     const mentionedBot = ctx.message?.entities?.some((entity) => {
       if (entity.type !== "mention") {
