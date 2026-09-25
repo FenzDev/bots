@@ -11,13 +11,17 @@ export default async (bot: Bot) => {
       },
     ];
 
-  await bot.api.setMyCommands(
-    commands,
-    { scope: { type: `all_group_chats` } },
-  );
-  await bot.api.setMyCommands(
-    commands,
-    { scope: { type: `all_private_chats` } },
+  Promise.all(
+    [
+      bot.api.setMyCommands(
+        commands,
+        { scope: { type: `all_group_chats` } },
+      ),
+      bot.api.setMyCommands(
+        commands,
+        { scope: { type: `all_private_chats` } },
+      ),
+    ]
   );
 
 };
