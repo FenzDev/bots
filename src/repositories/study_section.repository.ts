@@ -22,6 +22,9 @@ export const studySectionInputSchema = z
       .union([z.literal("null").transform(() => null), z.coerce.number().int()])
       .optional(),
 
+    timetableMultiSectionsSingleRow: z.number().optional(),
+    timetableMultiSectionsGroupsRowStart: z.number().optional(),
+    timetableMultiSectionsGroupsCount: z.number().optional(),
     timetableGID: z.string().optional(),
     timetableCurrentHash: z.string().optional(),
     timetableCurrentGridJSON: z.string().optional(),

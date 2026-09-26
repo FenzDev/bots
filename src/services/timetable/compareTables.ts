@@ -23,25 +23,35 @@ function areTimetableDiffsEqual(diffA: DiffPart[], diffB: DiffPart[]) {
   return true;
 }
 
-export function compareTables(timetableA: Timetable, timetableB: Timetable) {
+export function compareTables( timetableA: Timetable, timetableB: Timetable, singleSectionRow?:number, maxSectionsNumber?:number, groupsRowStart?:number, groupsCount?:number,) {
   const diffs: GroupsDiff[] = [];
 
   logger.debug({ timetableA, timetableB });
 
-  for (const [dayTime, aSession] of Object.entries(timetableA)) {
+  // for each day/time combination there are rows of groups
+  for (const [dayTime, aSessions] of Object.entries(timetableA)) {
     const [day, startTime] = dayTime.split("/");
 
-    const bSession = timetableB[dayTime];
+    const bSessions = timetableB[dayTime];
 
     const skipped = new Set<number>();
 
-    const maxGroupsNumber = Math.min(aSession.length, bSession.length);
+    const existingSessionsCount = Math.min(aSessions.length, bSessions.length);
 
-    for (let g = 0; g < maxGroupsNumber; g++) {
-      if (aSession[g] === bSession[g]) continue;
+    const targetSessionsCount = groupsCount? 
+      existingSessionsCount <= (maxSectionsNumber ?? groupsCount)?
+      1: // if sessions count is so small (assuming sections are less than num of groups)
+      groupsCount: // if groupsCount is defined we use it
+      existingSessionsCount; // if no groupsCount specified just use existing number
+    const targetSessionsStart = targetSessionsCount === 1?
+      singleSectionRow ?? 0:
+      groupsRowStart ?? 0;
+
+    for (let g = 0; g < targetSessionsCount; g++) {
+      if (aSessions[targetSessionsStart+g] === bSessions[targetSessionsStart+g]) continue;
       if (skipped.has(g)) continue;
 
-      const diff = diffWords(aSession[g], bSession[g]);
+      const diff = diffWords(aSessions[targetSessionsStart+g], bSessions[targetSessionsStart+g]);
       const groupsDiff: GroupsDiff = {
         groups: [g + 1],
         day,
@@ -55,17 +65,17 @@ export function compareTables(timetableA: Timetable, timetableB: Timetable) {
       // merge equivalent groups
       for (
         let otherG = g + 1;
-        otherG < Math.min(aSession.length, bSession.length);
+        otherG < targetSessionsCount;
         otherG++
       ) {
-        const otherDiff = diffWords(aSession[otherG], bSession[otherG]);
+        const otherDiff = diffWords(aSessions[targetSessionsStart+otherG], bSessions[targetSessionsStart+otherG]);
         if (areTimetableDiffsEqual(diff, otherDiff)) {
           groupsDiff.groups.push(otherG + 1);
           skipped.add(otherG);
         }
       }
 
-      if (groupsDiff.groups.length === maxGroupsNumber) {
+      if (groupsDiff.groups.length === targetSessionsCount) {
         groupsDiff.hasAllGroups = true;
       }
 
