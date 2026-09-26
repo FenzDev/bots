@@ -14,13 +14,13 @@ import {
   TIMETABLE_CHECK_SCHEDULE,
   TIMETABLE_CHECK_SETTLEMENT_DELAY,
 } from "../config/env.js";
-import { unzipHtmlFiles } from "../utils/timetable/unzipHtml.js";
-import { extractTables } from "../utils/timetable/extractTables.js";
-import { cleanTable } from "../utils/timetable/cleanTable.js";
-import { normalizeGrid } from "../utils/timetable/normalizeGrid.js";
-import { parseTableGrid } from "../utils/timetable/parseTableGrid.js";
-import { compareTables, GroupsDiff } from "../utils/timetable/compareTables.js";
-import { parseTimetableObject } from "../utils/timetable/parseTimetableObject.js";
+import { unzipHtmlFiles } from "../services/timetable/unzipHtml.js";
+import { extractTables } from "../services/timetable/extractTables.js";
+import { cleanTable } from "../services/timetable/cleanTable.js";
+import { normalizeGrid } from "../services/timetable/normalizeGrid.js";
+import { parseTableGrid } from "../services/timetable/parseTableGrid.js";
+import { compareTables, GroupsDiff } from "../services/timetable/compareTables.js";
+import { parseTimetableObject } from "../services/timetable/parseTimetableObject.js";
 import {
   Resource,
   resourceFiles,
@@ -28,7 +28,7 @@ import {
 } from "../repositories/resource.repository.js";
 import { InputFile } from "grammy";
 import { downloadDocumentAndStoreResource } from "../services/resources/download-store.js";
-import { addTextToTimetableImage } from "../utils/image/addTextToTimetableImage.js";
+import { addTextToTimetableImage } from "../services/image/addTextToTimetableImage.js";
 import { generateTimestampId } from "../utils/genid.js";
 import { WithId } from "mongodb";
 
