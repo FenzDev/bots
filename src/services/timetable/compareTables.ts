@@ -1,4 +1,5 @@
 import logger from "../../lib/logger.js";
+import { matchPattern } from "../../utils/matchPatern.js";
 import { DiffPart, diffWords } from "./diffwords.js";
 import { Timetable } from "./parseTimetableObject.js";
 
@@ -23,37 +24,44 @@ function areTimetableDiffsEqual(diffA: DiffPart[], diffB: DiffPart[]) {
   return true;
 }
 
-export function compareTables( timetableA: Timetable, timetableB: Timetable, singleSectionRow?:number, maxSectionsNumber?:number, groupsRowStart?:number, groupsCount?:number,) {
+export function compareTables(
+  timetableA: Timetable,
+  timetableB: Timetable,
+  sectionHeaderPatern: string,
+  groupsHeaderPatern: string,
+  groupsCount: number,
+) {
   const diffs: GroupsDiff[] = [];
 
   logger.debug({ timetableA, timetableB });
 
   // for each day/time combination there are rows of groups
-  for (const [dayTime, aSessions] of Object.entries(timetableA)) {
+  for (const [dayTime, groupsSessions] of Object.entries(timetableA)) {
     const [day, startTime] = dayTime.split("/");
-
-    const bSessions = timetableB[dayTime];
 
     const skipped = new Set<number>();
 
-    const existingSessionsCount = Math.min(aSessions.length, bSessions.length);
+    const groupsSessionsPairs = Object.entries(groupsSessions);
 
-    const targetSessionsCount = groupsCount? 
-      existingSessionsCount <= (maxSectionsNumber ?? groupsCount)?
-      1: // if sessions count is so small (assuming sections are less than num of groups)
-      groupsCount: // if groupsCount is defined we use it
-      existingSessionsCount; // if no groupsCount specified just use existing number
-    const targetSessionsStart = targetSessionsCount === 1?
-      singleSectionRow ?? 0:
-      groupsRowStart ?? 0;
+    for (let g = 0; g < groupsSessionsPairs.length; g++) {
+      const [group,aCells] = groupsSessionsPairs[g];
 
-    for (let g = 0; g < targetSessionsCount; g++) {
-      if (aSessions[targetSessionsStart+g] === bSessions[targetSessionsStart+g]) continue;
-      if (skipped.has(g)) continue;
+      if (matchPattern(group,sectionHeaderPatern)) continue;
 
-      const diff = diffWords(aSessions[targetSessionsStart+g], bSessions[targetSessionsStart+g]);
+      const bCells = timetableB[dayTime][group];
+
+      const minSessionsCount = Math.min(aCells.length, bCells.length);
+
+      if (minSessionsCount <= 0) continue;
+
+      // for (let g = 0; g < minSessionsCount; g++) {
+      if (aCells[0] === bCells[0]) continue;
+
+      const diff = diffWords(aCells[0], bCells[0]);
+      
+
       const groupsDiff: GroupsDiff = {
-        groups: [g + 1],
+        groups: [0],
         day,
         startTime,
         diff,
@@ -61,27 +69,26 @@ export function compareTables( timetableA: Timetable, timetableB: Timetable, sin
         isPureAdd: false,
         isPureRemove: false,
       };
-
-      // merge equivalent groups
-      for (
-        let otherG = g + 1;
-        otherG < targetSessionsCount;
-        otherG++
-      ) {
-        const otherDiff = diffWords(aSessions[targetSessionsStart+otherG], bSessions[targetSessionsStart+otherG]);
-        if (areTimetableDiffsEqual(diff, otherDiff)) {
-          groupsDiff.groups.push(otherG + 1);
-          skipped.add(otherG);
-        }
-      }
-
-      if (groupsDiff.groups.length === targetSessionsCount) {
-        groupsDiff.hasAllGroups = true;
-      }
-
-      diffs.push(groupsDiff);
     }
+
+    // // merge equivalent groups
+    // for (let otherG = g + 1; otherG < targetSessionsCount; otherG++) {
+    //   const otherDiff = diffWords(
+    //     aSessions[targetSessionsStart + otherG],
+    //     bSessions[targetSessionsStart + otherG],
+    //   );
+    //   if (areTimetableDiffsEqual(diff, otherDiff)) {
+    //     groupsDiff.groups.push(otherG + 1);
+    //     skipped.add(otherG);
+    //   }
+
+    if (groupsDiff.groups.length) {
+      groupsDiff.hasAllGroups = true;
+    }
+
+    diffs.push(groupsDiff);
   }
+  // }
 
   // sort diffs pure-removes -> pure-aditions -> mix
   const sortEval = (gDiff: GroupsDiff) =>

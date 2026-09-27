@@ -1,13 +1,17 @@
 import { string } from "zod";
-import { normalizeTimeString, tryNormalizeDayString } from "./normalizeStrings.js";
+import {
+  normalizeGroup,
+  normalizeTimeString,
+  tryNormalizeDayString,
+} from "./normalizeStrings.js";
 import { TableGrid } from "./parseTableGrid.js";
 
-export type Timetable = Record<string, string[]>;
+export type Timetable = Record<string, Record<string,string[]>>;
 
 export function parseTimetableObject(grid: TableGrid): Timetable | null {
   // identify the times row and remember each column to its time
   let columnTime: Record<number, string> | null = null;
-  let timesRow = 1;
+  let timesRow = 1; // 1 because first row has sheet letters
   for (let row = 1; row < grid.length; row++) {
     for (let col = 1; col < grid[row].length; col++) {
       let normalizedTimeStr = normalizeTimeString(grid[row][col]);
@@ -35,14 +39,17 @@ export function parseTimetableObject(grid: TableGrid): Timetable | null {
       const dayCell = tryNormalizeDayString(grid[row][col]);
       if (!dayCell) continue;
 
-      for (; col < grid[row].length; col += 1) {
+      const group = !columnTime[++col] ? normalizeGroup(grid[row][col]) : "";
+
+      for (col += 1; col < grid[row].length; col++) {
         const time = columnTime[col];
         if (!time) continue;
 
         const id = `${dayCell}/${time}`;
-        timetable[id] = timetable[id] ?? [];
+        timetable[id] = timetable[id] ?? {};
+        timetable[id][group] = timetable[id][group] ?? [];
 
-        timetable[id].push(grid[row][col].trim().replace(/\s+/g, " "));
+        timetable[id][group].push(grid[row][col].trim().replace(/\s+/g, " "));
       }
     }
   }

@@ -84,3 +84,11 @@ export function tryNormalizeDayString(str: string): string | undefined {
 
   return days[normalized];
 }
+
+export function normalizeGroup(str: string): string {
+  return str
+    .toLowerCase()
+    .trim()
+    .replace(/[.,]/g, "")
+    .replace(/\s+/g, "");
+}
