@@ -19,7 +19,10 @@ import { extractTables } from "../services/timetable/extractTables.js";
 import { cleanTable } from "../services/timetable/cleanTable.js";
 import { normalizeGrid } from "../services/timetable/normalizeGrid.js";
 import { parseTableGrid } from "../services/timetable/parseTableGrid.js";
-import { compareTables, GroupsDiff } from "../services/timetable/compareTables.js";
+import {
+  compareTables,
+  GroupsDiff,
+} from "../services/timetable/compareTables.js";
 import { parseTimetableObject } from "../services/timetable/parseTimetableObject.js";
 import {
   Resource,
@@ -103,7 +106,6 @@ export async function checkTimetables({
   forceSilentUpdate?: boolean;
   specificSections?: WithId<StudySection>[];
 }) {
-
   if (debugMode) {
     return;
   }
@@ -163,7 +165,9 @@ export async function checkTimetables({
       zipBuffer,
       (fileName) =>
         updatedTimetables.findIndex(
-          (t) => `${t.section.name}.html` === fileName,
+          (t) =>
+            `${t.section.timetableSheetName ?? t.section.name}.html` ===
+            fileName,
         ) >= 0,
     );
 
@@ -171,7 +175,7 @@ export async function checkTimetables({
       // TODO : set other name field of section repo for html
       // incase section.name is not same as one in gsheets
       const htmlFile = htmls.find(
-        (h) => h.sourceFile === `${timetable.section.name}.html`,
+        (h) => h.sourceFile === `${timetable.section.timetableSheetName ?? timetable.section.name}.html`,
       );
 
       if (!htmlFile) {
@@ -210,7 +214,13 @@ export async function checkTimetables({
       }
 
       // Get the diffs
-      timetable.diffs = compareTables(timetableA, timetableB);
+      timetable.diffs = compareTables(
+        timetableA,
+        timetableB,
+        timetable.section.timetableMultiSectionsIndex,
+        timetable.section.timetableMultiSectionsMaxNumber,
+        timetable.section.timetableMultiSectionsGroupsCount,
+      );
 
       // Persist the stable hash/grid only after the debounce + comparison.
       await studySections.setStudySection({
@@ -313,8 +323,8 @@ async function checkCSV(
         },
         "Timetable has stopped changing.",
       );
-
-      break;
+      
+      return latestHash;
     }
 
     logger.debug(
@@ -326,7 +336,7 @@ async function checkCSV(
       "Timetable changed again while waiting, continuing debounce.",
     );
 
-    return (stableHash = latestHash);
+    return latestHash;
   }
 }
 
@@ -388,7 +398,7 @@ async function downloadAndStoreEdtPdf(
   if (!section.timetableStoargeChatId) return;
 
   const timestamp = formatAlgiersDate(new Date());
-  const timestampNoSpaces = timestamp.replaceAll(' ','')
+  const timestampNoSpaces = timestamp.replaceAll(" ", "");
   const fileName = `EDT_${section.displayShort?.replaceAll(" ", "") ?? section.name} (${timestampNoSpaces}).pdf`;
   const resourceFileName = `edt_${timestampNoSpaces}_${generateTimestampId()}`;
   const previewImg = section.displayShort

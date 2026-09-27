@@ -23,7 +23,7 @@ function areTimetableDiffsEqual(diffA: DiffPart[], diffB: DiffPart[]) {
   return true;
 }
 
-export function compareTables( timetableA: Timetable, timetableB: Timetable, singleSectionRow?:number, maxSectionsNumber?:number, groupsRowStart?:number, groupsCount?:number,) {
+export function compareTables( timetableA: Timetable, timetableB: Timetable, sectionRowsIndex?:number, maxSectionsNumber?:number, groupsCount?:number,) {
   const diffs: GroupsDiff[] = [];
 
   logger.debug({ timetableA, timetableB });
@@ -44,8 +44,8 @@ export function compareTables( timetableA: Timetable, timetableB: Timetable, sin
       groupsCount: // if groupsCount is defined we use it
       existingSessionsCount; // if no groupsCount specified just use existing number
     const targetSessionsStart = targetSessionsCount === 1?
-      singleSectionRow ?? 0:
-      groupsRowStart ?? 0;
+      sectionRowsIndex ?? 0:
+      (sectionRowsIndex ?? 0)*(groupsCount ?? 0);
 
     for (let g = 0; g < targetSessionsCount; g++) {
       if (aSessions[targetSessionsStart+g] === bSessions[targetSessionsStart+g]) continue;

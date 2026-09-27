@@ -22,10 +22,11 @@ export const studySectionInputSchema = z
       .union([z.literal("null").transform(() => null), z.coerce.number().int()])
       .optional(),
 
-    timetableMultiSectionsSingleRow: z.number().optional(),
-    timetableMultiSectionsGroupsRowStart: z.number().optional(),
-    timetableMultiSectionsGroupsCount: z.number().optional(),
+    timetableMultiSectionsIndex: z.coerce.number().optional(),
+    timetableMultiSectionsMaxNumber: z.coerce.number().optional(),
+    timetableMultiSectionsGroupsCount: z.coerce.number().optional(),
     timetableGID: z.string().optional(),
+    timetableSheetName: z.string().optional(),
     timetableCurrentHash: z.string().optional(),
     timetableCurrentGridJSON: z.string().optional(),
     timetableLastStoredResourceName: z.string().optional(),

@@ -11,7 +11,6 @@ export default async (bot: Bot) => {
   bot.on("message", async (ctx, next) => {
     const botId = ctx.me.id;
 
-    logger.debug(ctx, "tfo");
 
     if (
       !ctx.message.reply_to_message ||
@@ -25,7 +24,6 @@ export default async (bot: Bot) => {
     )
       return next();
 
-    logger.debug("tfo yep replied to bot");
 
     replyAIToUser(ctx);
 

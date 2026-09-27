@@ -5,5 +5,4 @@ export const WEATHER_LOCATION: WeatherLocation = {
   latitude: 36.4700,
   longitude: 2.8277,
   timezone: "Africa/Algiers",
-
 };
