@@ -223,10 +223,10 @@ export async function checkTimetables({
       timetable.diffs = compareTables(
         timetableA,
         timetableB,
-        timetable.section.timetableSectionHeaderPatern ??
+        timetable.section.timetableSectionHeaderPatern?.toLowerCase() ??
           timetable.section.sectionLetter ??
           "Section",
-        timetable.section.timetableGroupHeaderPatern ??
+        timetable.section.timetableGroupHeaderPatern?.toLowerCase() ??
           `${timetable.section.sectionLetter ?? "G"}$`,
         timetable.section.groupsCount ?? 1,
       );

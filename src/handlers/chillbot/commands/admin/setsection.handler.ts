@@ -12,6 +12,7 @@ const SECTION_FIELDS_HELP = [
   "`displayLong` — Long display name",
   "`displayShort` — Short display name",
   "`sectionLetter` — Section letter",
+  "`groupsCount` — Number of groups in section",
 
   "`timetableStoargeChatId` — Telegram chat ID to store PDF of changed table",
   "`timetableStoargeThreadId` — Telegram thread ID or `null`",
@@ -19,9 +20,8 @@ const SECTION_FIELDS_HELP = [
   "`timetableBroadcastChatId` — Telegram chat ID to broadcast changes",
   "`timetableBroadcastThreadId` — Telegram thread ID or `null`",
 
-  "`timetableMultiSectionsIndex` — The order of the section in multi-sections table",
-  "`timetableMultiSectionsMaxNumber` — Maximum number of timetable sections",
-  "`timetableMultiSectionsGroupsCount` — Number of timetable section groups",
+  "`timetableSectionHeaderPatern` — The string patern of section header in timetable",
+  "`timetableGroupHeaderPatern` — The string patern of group header in timetable (use $ to represent dynamic value, * works as well as wildcard)",
 
   "`timetableGID` — Timetable Google ID",
   "`timetableSheetName` — Timetable Google Sheet name",
