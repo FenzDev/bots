@@ -421,6 +421,10 @@ async function downloadAndStoreEdtPdf(
         section.name,
       )
     : undefined;
+
+  logger.info({defaultTimetableStoargeChatId:(await runtimeConfig.get()).defaultStorageChatId});
+  logger.info({defaultTimetableStoargeThreadId:(await runtimeConfig.get()).defaultStorageThreadId});
+
   const timetableResource = await downloadDocumentAndStoreResource(
     `${baseDownloadUrl}?gid=${section.timetableGID}&format=pdf`,
     {
