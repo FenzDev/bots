@@ -169,7 +169,7 @@ export async function checkTimetables({
       (fileName) =>
         updatedTimetables.findIndex(
           (t) =>
-            `${t.section.timetableSheetName ?? t.section.name}.html` ===
+            `${t.section.timetableSheetName?.toLowerCase() ?? t.section.name}.html` ===
             fileName,
         ) >= 0,
     );
