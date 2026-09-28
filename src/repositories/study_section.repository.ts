@@ -26,6 +26,7 @@ export const studySectionInputSchema = z
     timetableSectionHeaderPatern: z.string().optional(),
     timetableGroupHeaderPatern: z.string().optional(),
     timetableGID: z.string().optional(),
+    timetableSheetName: z.string().optional(),
     timetableCurrentHash: z.string().optional(),
     timetableCurrentGridJSON: z.string().optional(),
     timetableLastStoredResourceName: z.string().optional(),
