@@ -180,7 +180,7 @@ export async function checkTimetables({
       const htmlFile = htmls.find(
         (h) =>
           h.sourceFile ===
-          `${timetable.section.timetableSheetName ?? timetable.section.name}.html`,
+          `${timetable.section.timetableSheetName?.toLowerCase() ?? timetable.section.name}.html`,
       );
 
       if (!htmlFile) {
