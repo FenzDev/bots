@@ -23,10 +23,6 @@ import {
   compareTables,
   GroupsDiff,
 } from "../services/timetable/compareTables.js";
-import {
-  compareTables,
-  GroupsDiff,
-} from "../services/timetable/compareTables.js";
 import { parseTimetableObject } from "../services/timetable/parseTimetableObject.js";
 import {
   Resource,
