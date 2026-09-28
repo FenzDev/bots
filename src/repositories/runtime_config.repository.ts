@@ -5,6 +5,8 @@ import { db } from "../lib/mongodb.js";
 export type RuntimeConfig = {
   _id: "global";
   timetablesId: string;
+  defaultStorageChatId?: number;
+  defaultStorageThreadId?: number;
   weatherForcastChannelId: number;
 };
 
@@ -23,6 +25,8 @@ async function get(): Promise<RuntimeConfig> {
   const defaultConfig: RuntimeConfig = {
     _id: "global",
     timetablesId: "",
+    defaultStorageChatId: undefined,
+    defaultStorageThreadId: undefined,
     weatherForcastChannelId: 0,
   };
 

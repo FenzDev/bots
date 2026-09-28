@@ -406,7 +406,6 @@ async function downloadAndStoreEdtPdf(
   section: StudySection,
   baseDownloadUrl: string,
 ): Promise<Resource | undefined> {
-  if (!section.timetableStoargeChatId) return;
 
   const timestamp = formatAlgiersDate(new Date());
   const timestampNoSpaces = timestamp.replaceAll(" ", "");
@@ -422,8 +421,8 @@ async function downloadAndStoreEdtPdf(
   const timetableResource = await downloadDocumentAndStoreResource(
     `${baseDownloadUrl}?gid=${section.timetableGID}&format=pdf`,
     {
-      chatId: section.timetableStoargeChatId!,
-      threadId: section.timetableStoargeThreadId ?? null,
+      chatId: section.timetableStoargeChatId ?? (await runtimeConfig.get()).defaultStorageChatId!,
+      threadId: section.timetableStoargeThreadId ?? (await runtimeConfig.get()).defaultStorageThreadId ?? null,
       fileName,
       previewFile: previewImg ? new InputFile(previewImg) : undefined,
     },
