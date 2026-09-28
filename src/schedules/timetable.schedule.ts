@@ -124,6 +124,9 @@ export async function checkTimetables({
   const updatedTimetables: SectionUpdate[] = [];
 
   const { timetablesId } = await runtimeConfig.get();
+
+  if (!timetablesId) throw new Error('No timetable id was specified');
+
   const baseUrl = `https://docs.google.com/spreadsheets/d/${timetablesId}`;
   const baseDownloadUrl = `${baseUrl}/export`;
 

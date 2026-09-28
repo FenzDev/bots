@@ -4,10 +4,10 @@ import { db } from "../lib/mongodb.js";
 
 export type RuntimeConfig = {
   _id: "global";
-  timetablesId: string;
+  timetablesId?: string;
   defaultStorageChatId?: number;
   defaultStorageThreadId?: number;
-  weatherForcastChannelId: number;
+  weatherForcastChannelId?: number;
 };
 
 export type RuntimeConfigInput = Omit<RuntimeConfig, "_id">;
