@@ -23,8 +23,8 @@ export default async (bot: Bot) => {
 
         await studySections.setStudySection({
           name:section.name,
-          timetableStoargeChatId: (await runtimeConfig.get()).defaultStorageChatId,
-          timetableStoargeThreadId: (await runtimeConfig.get()).defaultStorageThreadId,
+          timetableStoargeChatId: section.timetableStoargeChatId ?? (await runtimeConfig.get()).defaultStorageChatId,
+          timetableStoargeThreadId: section.timetableStoargeThreadId ?? (await runtimeConfig.get()).defaultStorageThreadId,
         })
 
         logger.debug('lets a go')
