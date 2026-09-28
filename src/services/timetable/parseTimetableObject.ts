@@ -6,7 +6,7 @@ import {
 } from "./normalizeStrings.js";
 import { TableGrid } from "./parseTableGrid.js";
 
-export type Timetable = Record<string, Record<string,string[]>>;
+export type Timetable = Record<string, Record<string,string>>;
 
 export function parseTimetableObject(grid: TableGrid): Timetable | null {
   // identify the times row and remember each column to its time
@@ -46,10 +46,17 @@ export function parseTimetableObject(grid: TableGrid): Timetable | null {
         if (!time) continue;
 
         const id = `${dayCell}/${time}`;
-        timetable[id] = timetable[id] ?? {};
-        timetable[id][group] = timetable[id][group] ?? [];
 
-        timetable[id][group].push(grid[row][col].trim().replace(/\s+/g, " "));
+        const session = grid[row][col].trim().replace(/\s+/g, " ");
+        
+        timetable[id] = timetable[id] ?? {};
+        if (!timetable[id][group]){
+          timetable[id][group] = ''
+        } else if (session !== '') {
+          timetable[id][group] = '\n'
+        }
+
+        timetable[id][group] += session;
       }
     }
   }

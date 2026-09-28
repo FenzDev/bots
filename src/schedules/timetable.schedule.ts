@@ -19,7 +19,10 @@ import { extractTables } from "../services/timetable/extractTables.js";
 import { cleanTable } from "../services/timetable/cleanTable.js";
 import { normalizeGrid } from "../services/timetable/normalizeGrid.js";
 import { parseTableGrid } from "../services/timetable/parseTableGrid.js";
-import { compareTables, GroupsDiff } from "../services/timetable/compareTables.js";
+import {
+  compareTables,
+  GroupsDiff,
+} from "../services/timetable/compareTables.js";
 import { parseTimetableObject } from "../services/timetable/parseTimetableObject.js";
 import {
   Resource,
@@ -103,7 +106,6 @@ export async function checkTimetables({
   forceSilentUpdate?: boolean;
   specificSections?: WithId<StudySection>[];
 }) {
-
   if (debugMode) {
     return;
   }
@@ -163,7 +165,9 @@ export async function checkTimetables({
       zipBuffer,
       (fileName) =>
         updatedTimetables.findIndex(
-          (t) => `${t.section.name}.html` === fileName,
+          (t) =>
+            `${t.section.timetableSheetName ?? t.section.name}.html` ===
+            fileName,
         ) >= 0,
     );
 
@@ -171,7 +175,9 @@ export async function checkTimetables({
       // TODO : set other name field of section repo for html
       // incase section.name is not same as one in gsheets
       const htmlFile = htmls.find(
-        (h) => h.sourceFile === `${timetable.section.name}.html`,
+        (h) =>
+          h.sourceFile ===
+          `${timetable.section.timetableSheetName ?? timetable.section.name}.html`,
       );
 
       if (!htmlFile) {
@@ -210,7 +216,16 @@ export async function checkTimetables({
       }
 
       // Get the diffs
-      timetable.diffs = compareTables(timetableA, timetableB);
+      timetable.diffs = compareTables(
+        timetableA,
+        timetableB,
+        timetable.section.timetableSectionHeaderPatern ??
+          timetable.section.sectionLetter ??
+          "Section",
+        timetable.section.timetableGroupHeaderPatern ??
+          `${timetable.section.sectionLetter ?? "G"}$`,
+        timetable.section.groupsCount ?? 1,
+      );
 
       // Persist the stable hash/grid only after the debounce + comparison.
       await studySections.setStudySection({
@@ -248,10 +263,26 @@ ${diffResultToText(update.section, update.diffs)}
         .trim()
         .replace(/([`#+\-=|{}.!])/g, "\\$1");
 
+      const broadcastWithoutFile = async (update:SectionUpdate) =>
+        await chillBot.api.sendMessage(
+          update.section.timetableBroadcastChatId!,
+          text,
+          {
+            parse_mode: "MarkdownV2",
+            message_thread_id:
+              update.section.timetableBroadcastThreadId ?? undefined,
+          },
+        );
+
       if (pdfResource) {
         const pdfResFile = (
           await resourceFiles.findResourceFiles(pdfResource._id)
         )[0];
+
+        if (!pdfResFile) {
+          await broadcastWithoutFile(update);
+        }
+
         await chillBot.api.copyMessage(
           update.section.timetableBroadcastChatId!,
           pdfResource.telegramStoredChatId!,
@@ -265,15 +296,7 @@ ${diffResultToText(update.section, update.diffs)}
           },
         );
       } else {
-        await chillBot.api.sendMessage(
-          update.section.timetableBroadcastChatId!,
-          text,
-          {
-            parse_mode: "MarkdownV2",
-            message_thread_id:
-              update.section.timetableBroadcastThreadId ?? undefined,
-          },
-        );
+        await broadcastWithoutFile(update);
       }
 
       logger.debug("Broadcasted and changed hash and grid for that");
@@ -314,7 +337,7 @@ async function checkCSV(
         "Timetable has stopped changing.",
       );
 
-      break;
+      return latestHash;
     }
 
     logger.debug(
@@ -336,9 +359,7 @@ function diffResultToText(section: StudySection, diffs: GroupsDiff[]) {
     .map((groupsDiff) => {
       const groups = groupsDiff.hasAllGroups
         ? `#${section.displayShort?.toLowerCase().replaceAll(" ", "\\_")} #section`
-        : groupsDiff.groups
-            .map((g) => `#${section.sectionLetter?.toLowerCase() ?? "g"}${g}`)
-            .join(" ");
+        : groupsDiff.groups.map((g) => `#${g}`).join(" ");
 
       const dayTime = `${groupsDiff.day} ${groupsDiff.startTime}`;
 
@@ -388,7 +409,7 @@ async function downloadAndStoreEdtPdf(
   if (!section.timetableStoargeChatId) return;
 
   const timestamp = formatAlgiersDate(new Date());
-  const timestampNoSpaces = timestamp.replaceAll(' ','')
+  const timestampNoSpaces = timestamp.replaceAll(" ", "");
   const fileName = `EDT_${section.displayShort?.replaceAll(" ", "") ?? section.name} (${timestampNoSpaces}).pdf`;
   const resourceFileName = `edt_${timestampNoSpaces}_${generateTimestampId()}`;
   const previewImg = section.displayShort

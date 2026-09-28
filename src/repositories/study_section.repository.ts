@@ -11,6 +11,7 @@ export const studySectionInputSchema = z
     displayLong: z.string().optional(),
     displayShort: z.string().optional(),
     sectionLetter: z.string().optional(),
+    groupsCount: z.coerce.number().optional(),
 
     timetableStoargeChatId: z.coerce.number().optional(),
     timetableStoargeThreadId: z
@@ -22,13 +23,13 @@ export const studySectionInputSchema = z
       .union([z.literal("null").transform(() => null), z.coerce.number().int()])
       .optional(),
 
-    timetableMultiSectionsSingleRow: z.number().optional(),
-    timetableMultiSectionsGroupsRowStart: z.number().optional(),
-    timetableMultiSectionsGroupsCount: z.number().optional(),
+    timetableSectionHeaderPatern: z.string().optional(),
+    timetableGroupHeaderPatern: z.string().optional(),
     timetableGID: z.string().optional(),
     timetableCurrentHash: z.string().optional(),
     timetableCurrentGridJSON: z.string().optional(),
     timetableLastStoredResourceName: z.string().optional(),
+    timetableSheetName: z.string().optional(),
 
     telegramChatId: z.coerce.number().int().optional(),
   })
