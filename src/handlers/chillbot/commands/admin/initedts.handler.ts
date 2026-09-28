@@ -21,6 +21,12 @@ export default async (bot: Bot) => {
           continue;
         }
 
+        await studySections.setStudySection({
+          name:section.name,
+          timetableStoargeChatId: (await runtimeConfig.get()).defaultStorageChatId,
+          timetableStoargeThreadId: (await runtimeConfig.get()).defaultStorageThreadId,
+        })
+
         logger.debug('lets a go')
         await checkTimetables({
           specificSections: [section],
