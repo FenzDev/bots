@@ -4,7 +4,7 @@ import { DiffPart, diffWords } from "./diffwords.js";
 import { Timetable } from "./parseTimetableObject.js";
 
 export type GroupsDiff = {
-  groups: number[];
+  groups: string[];
   day: string;
   startTime: string;
   hasAllGroups: boolean;
@@ -44,24 +44,26 @@ export function compareTables(
     const groupsSessionsPairs = Object.entries(groupsSessions);
 
     for (let g = 0; g < groupsSessionsPairs.length; g++) {
-      const [group,aCells] = groupsSessionsPairs[g];
+      const [group,aGroupCells] = groupsSessionsPairs[g];
 
-      if (matchPattern(group,sectionHeaderPatern)) continue;
+      let match;
+      if (!(match = matchPattern(group,sectionHeaderPatern))) continue;
 
-      const bCells = timetableB[dayTime][group];
+      const bGroupCells = timetableB[dayTime][group];
 
-      const minSessionsCount = Math.min(aCells.length, bCells.length);
+      const minSessionsCount = Math.min(aGroupCells.length, bGroupCells.length);
 
       if (minSessionsCount <= 0) continue;
 
       // for (let g = 0; g < minSessionsCount; g++) {
-      if (aCells[0] === bCells[0]) continue;
-
-      const diff = diffWords(aCells[0], bCells[0]);
+      if (aGroupCells[0] === bGroupCells[0]) continue;
       
-
+      const diff = diffWords(aGroupCells[0], bGroupCells[0]);
+      
+      skipped.add(g);
+      
       const groupsDiff: GroupsDiff = {
-        groups: [0],
+        groups: [group],
         day,
         startTime,
         diff,
@@ -69,18 +71,30 @@ export function compareTables(
         isPureAdd: false,
         isPureRemove: false,
       };
-    }
 
+      for (let gOther = g+1; gOther < groupsSessionsPairs.length; gOther++) {
+        if (skipped.has(gOther)) continue;
+        if (!(match = matchPattern(group,sectionHeaderPatern))) continue;
+        
+        const otherDiff = diffWords(
+          groupsSessionsPairs[g][0],
+          groupsSessionsPairs[gOther][0], 
+          // TODO: Sounds not right that we use old table to compare
+        );
+
+        if (areTimetableDiffsEqual(diff, otherDiff)) {
+          groupsDiff.groups.push(groupsSessionsPairs[gOther][0]);
+          skipped.add(gOther);
+        }
+
+        skipped.add(gOther);
+      }
+
+
+      skipped.clear();
     // // merge equivalent groups
     // for (let otherG = g + 1; otherG < targetSessionsCount; otherG++) {
-    //   const otherDiff = diffWords(
-    //     aSessions[targetSessionsStart + otherG],
-    //     bSessions[targetSessionsStart + otherG],
-    //   );
-    //   if (areTimetableDiffsEqual(diff, otherDiff)) {
-    //     groupsDiff.groups.push(otherG + 1);
-    //     skipped.add(otherG);
-    //   }
+    //   
 
     if (groupsDiff.groups.length) {
       groupsDiff.hasAllGroups = true;
