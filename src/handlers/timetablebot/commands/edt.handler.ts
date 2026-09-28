@@ -15,6 +15,8 @@ export default async (bot: Bot) => {
   async function sendEdt(ctx: Context, section: StudySection) {
     if (!ctx.chat) return;
 
+    logger.info({ctx},"Pre-Sending documents");
+    
     const edtResourceName = section.timetableLastStoredResourceName;
     if (!edtResourceName) return false;
 
@@ -26,6 +28,8 @@ export default async (bot: Bot) => {
     );
     if (!pdfFile) return false;
 
+    logger.info({edtResourceName,pdfFile},"Sending documents");
+    
     await ctx.api.sendDocument(ctx.chat?.id, pdfFile.fileId, {
       receiver_user_id: ctx.from?.id !== ctx.chatId ? ctx.from?.id : undefined,
       message_thread_id: ctx.message?.message_thread_id ?? undefined,
@@ -90,7 +94,7 @@ export default async (bot: Bot) => {
     await ctx.answerCallbackQuery();
 
     const message = ctx.callbackQuery.message;
-    if (!message) return;
+    if (!message) return next();
 
     if (message?.ephemeral_message_id !== undefined) {
       await ctx.api.deleteEphemeralMessage(
