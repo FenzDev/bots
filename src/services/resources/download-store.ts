@@ -1,4 +1,4 @@
-import { InputFile } from "grammy";
+import { Bot, InputFile } from "grammy";
 import { resourcesBot } from "../../lib/bots/index.js";
 import {
   Resource,
@@ -17,8 +17,9 @@ export async function downloadDocumentAndStoreResource(
     previewFile?: InputFile;
   },
   resourceOther?: ResourceInput,
+  customBot?:Bot,
 ): Promise<Resource> {
-  const docMessage = await resourcesBot.api.sendDocument(
+  const docMessage = await (customBot??resourcesBot).api.sendDocument(
     storageOptions.chatId,
     new InputFile(new URL(resourceFileDownloadUrl), storageOptions.fileName),
     {

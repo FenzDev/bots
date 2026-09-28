@@ -1,7 +1,7 @@
 import cron from "node-cron";
 import logger from "../lib/logger.js";
 import { debugMode } from "../handlers/chillbot/commands/admin/dbg.handler.js";
-import { chillBot, resourcesBot } from "../lib/bots/index.js";
+import { chillBot, resourcesBot, timetableBot } from "../lib/bots/index.js";
 import {
   StudySection,
   studySections,
@@ -440,6 +440,7 @@ async function downloadAndStoreEdtPdf(
       type: "TIMETABLE",
       displayName: fileName,
     },
+    timetableBot,
   );
 
   await studySections.setStudySection({
