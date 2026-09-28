@@ -30,7 +30,6 @@ export const studySectionInputSchema = z
     timetableCurrentHash: z.string().optional(),
     timetableCurrentGridJSON: z.string().optional(),
     timetableLastStoredResourceName: z.string().optional(),
-    timetableSheetName: z.string().optional(),
 
     telegramChatId: z.coerce.number().int().optional(),
   })
