@@ -21,7 +21,7 @@ const SECTION_FIELDS_HELP = [
   "`timetableBroadcastThreadId` — Telegram thread ID or `null`",
 
   "`timetableSectionHeaderPatern` — The string patern of section header in timetable",
-  "`timetableGroupHeaderPatern` — The string patern of group header in timetable (use $ to represent dynamic value, * works as well as wildcard)",
+  "`timetableGroupHeaderPatern` — The string patern of group header in timetable (use $ to represent dynamic value, \\* works as well as wildcard)",
 
   "`timetableGID` — Timetable Google ID",
   "`timetableSheetName` — Timetable Google Sheet name",
