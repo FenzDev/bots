@@ -83,6 +83,12 @@ async function findStudySectionsByChat(chatId: number) {
   ).toArray();
 }
 
+async function findStudySectionBySheetName(sheetName:string) {
+  return collection.find({
+    timetableSheetName: sheetName,
+  }).toArray();
+}
+
 async function getAllStudySections() {
   return collection.find().toArray();
 }
@@ -91,5 +97,6 @@ export const studySections = {
   setStudySection,
   findStudySectionByName,
   findStudySectionsByChat,
+  findStudySectionBySheetName,
   getAllStudySections,
 };

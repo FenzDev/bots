@@ -412,18 +412,15 @@ async function downloadAndStoreEdtPdf(
 
   const timestamp = formatAlgiersDate(new Date());
   const timestampNoSpaces = timestamp.replaceAll(" ", "");
-  const fileName = `EDT_${section.displayShort?.replaceAll(" ", "") ?? section.name} (${timestampNoSpaces}).pdf`;
+  const fileName = `EDT_${section.timetableSheetName?.replaceAll(" ", "") ?? section.name} (${timestampNoSpaces}).pdf`;
   const resourceFileName = `edt_${timestampNoSpaces}_${generateTimestampId()}`;
   const previewImg = section.displayShort
     ? await addTextToTimetableImage(
-        section.displayShort,
+        section.timetableSheetName ?? section.displayShort,
         timestamp,
         section.name,
       )
     : undefined;
-
-  logger.info({defaultTimetableStoargeChatId:(await runtimeConfig.get()).defaultStorageChatId});
-  logger.info({defaultTimetableStoargeThreadId:(await runtimeConfig.get()).defaultStorageThreadId});
 
   const timetableResource = await downloadDocumentAndStoreResource(
     `${baseDownloadUrl}?gid=${section.timetableGID}&format=pdf`,
@@ -434,7 +431,7 @@ async function downloadAndStoreEdtPdf(
       previewFile: previewImg ? new InputFile(previewImg) : undefined,
     },
     {
-      name: `res_${section.name}_${resourceFileName.toLowerCase()}`,
+      name: `res_${section.timetableSheetName}_${resourceFileName.toLowerCase()}`,
       isApproved: true,
       isMediaGroup: false,
       type: "TIMETABLE",
@@ -447,6 +444,21 @@ async function downloadAndStoreEdtPdf(
     name: section.name,
     timetableLastStoredResourceName: timetableResource.name,
   });
+
+  if (section.timetableSheetName) {
+    const sheetFamily = await studySections.findStudySectionBySheetName(section.timetableSheetName);
+    for (const sameSheetSection of sheetFamily) {
+      if (sameSheetSection.name===section.name) continue;
+
+      await studySections.setStudySection({
+        name: sameSheetSection.name,
+        timetableCurrentHash: section.timetableCurrentHash,
+        timetableCurrentGridJSON: section.timetableCurrentGridJSON,
+        timetableLastStoredResourceName: timetableResource.name,
+      });
+
+    }
+  }
 
   return timetableResource;
 }
