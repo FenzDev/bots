@@ -38,7 +38,7 @@ export default async (bot: Bot) => {
   }
 
   bot.command("edt", async (ctx, next) => {
-    do {
+    try {
       const match = ctx.match.trim();
       const matchSection = await studySections.findStudySectionByName(match);
 
@@ -47,41 +47,45 @@ export default async (bot: Bot) => {
           return next();
         }
       }
-    } while (false);
 
-    // TODO: know section from chat or show menu
-    let sectionsOfChat = await studySections.findStudySectionsByChat(
-      ctx.chat.id,
-    );
+      // TODO: know section from chat or show menu
+      let sectionsOfChat = await studySections.findStudySectionsByChat(
+        ctx.chat.id,
+      );
 
-    if (sectionsOfChat.length === 1) {
-      await sendEdt(ctx, sectionsOfChat[0]);
+      if (sectionsOfChat.length === 1) {
+        await sendEdt(ctx, sectionsOfChat[0]);
+        return next();
+      }
+
+      if (sectionsOfChat.length === 0) {
+        sectionsOfChat = await studySections.getAllStudySections();
+      }
+
+      const buttons: InlineKeyboardButton[] = sectionsOfChat.map((section) => ({
+        text: section.displayShort ?? `"${section.name}"`,
+        callback_data: `edt_${section.name}`,
+      }));
+
+      const rows: InlineKeyboardButton[][] = [];
+
+      for (let i = 0; i < buttons.length; i += 2) {
+        rows.push(buttons.slice(i, i + 2));
+      }
+
+      await ctx.reply("Choose section:", {
+        receiver_user_id:
+          ctx.from?.id !== ctx.chatId ? ctx.from?.id : undefined,
+        reply_markup: {
+          inline_keyboard: rows,
+        },
+      });
+
       return next();
+    } catch (err) {
+      const error = err as Error;
+      logger.error({error:error.message});
     }
-
-    if (sectionsOfChat.length === 0) {
-      sectionsOfChat = await studySections.getAllStudySections();
-    }
-
-    const buttons: InlineKeyboardButton[] = sectionsOfChat.map((section) => ({
-      text: section.displayShort ?? `"${section.name}"`,
-      callback_data: `edt_${section.name}`,
-    }));
-
-    const rows: InlineKeyboardButton[][] = [];
-
-    for (let i = 0; i < buttons.length; i += 2) {
-      rows.push(buttons.slice(i, i + 2));
-    }
-
-    await ctx.reply("Choose section:", {
-      receiver_user_id: ctx.from?.id !== ctx.chatId ? ctx.from?.id : undefined,
-      reply_markup: {
-        inline_keyboard: rows,
-      },
-    });
-
-    return next();
   });
 
   bot.callbackQuery(/^edt(?:_(.+))?$/, async (ctx, next) => {
