@@ -452,8 +452,6 @@ async function downloadAndStoreEdtPdf(
 
       await studySections.setStudySection({
         name: sameSheetSection.name,
-        timetableCurrentHash: section.timetableCurrentHash,
-        timetableCurrentGridJSON: section.timetableCurrentGridJSON,
         timetableLastStoredResourceName: timetableResource.name,
       });
 
