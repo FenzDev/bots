@@ -242,11 +242,11 @@ export async function checkTimetables({
 
     while ((update = updatedTimetables.shift())) {
       if (!update.diffs?.length) {
-        logger.debug("No realistic differences in any session.");
+        logger.info({section:update.section.name}, "No realistic differences in any session.");
         continue;
       }
 
-      logger.debug("Broadcasting the update");
+      logger.info({section:update.section.name},"Broadcasting the update");
 
       const pdfResource = await downloadAndStoreEdtPdf(
         update.section,
@@ -302,7 +302,7 @@ ${diffResultToText(update.section, update.diffs)}
         await broadcastWithoutFile(update);
       }
 
-      logger.debug("Broadcasted and changed hash and grid for that");
+      logger.info({section:update.section.name},"Broadcasted and changed hash and grid for that");
     }
   }
 }
@@ -316,7 +316,7 @@ async function checkCSV(
     return null;
   }
 
-  logger.debug(
+  logger.info(
     { section: section.name },
     "Different Timetable is detected, waiting for changes to settle.",
   );
@@ -332,7 +332,7 @@ async function checkCSV(
     const latestHash = hashText(latestCSV);
 
     if (latestHash === stableHash) {
-      logger.debug(
+      logger.info(
         {
           section: section.name,
           hash: stableHash,
@@ -343,7 +343,7 @@ async function checkCSV(
       return latestHash;
     }
 
-    logger.debug(
+    logger.info(
       {
         section: section.name,
         previousHash: stableHash,
