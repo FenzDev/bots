@@ -267,7 +267,7 @@ ${diffResultToText(update.section, update.diffs)}
         .replace(/([`#+\-=|{}.!])/g, "\\$1");
 
       const broadcastWithoutFile = async (update:SectionUpdate) =>
-        await chillBot.api.sendMessage(
+        await timetableBot.api.sendMessage(
           update.section.timetableBroadcastChatId!,
           text,
           {
@@ -284,9 +284,10 @@ ${diffResultToText(update.section, update.diffs)}
 
         if (!pdfResFile) {
           await broadcastWithoutFile(update);
+          return;
         }
 
-        await chillBot.api.sendDocument(
+        await timetableBot.api.sendDocument(
           update.section.timetableBroadcastChatId!,
           pdfResFile.fileId,
           {
