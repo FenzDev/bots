@@ -286,13 +286,11 @@ ${diffResultToText(update.section, update.diffs)}
           await broadcastWithoutFile(update);
         }
 
-        await chillBot.api.copyMessage(
+        await chillBot.api.sendDocument(
           update.section.timetableBroadcastChatId!,
-          pdfResource.telegramStoredChatId!,
-          pdfResFile.telegramStoredMessageId!,
+          pdfResFile.fileId,
           {
             caption: text,
-            show_caption_above_media: true,
             parse_mode: "MarkdownV2",
             message_thread_id:
               update.section.timetableBroadcastThreadId ?? undefined,
