@@ -30,9 +30,10 @@ export default async (bot: Bot) => {
 
     logger.info({ edtResourceName, pdfFile }, "Sending documents");
 
-    await ctx.api.sendDocument(ctx.chat?.id, pdfFile.fileId, {
+    await ctx.api.sendDocument(ctx.chat.id, pdfFile.fileId, {
       receiver_user_id: ctx.from?.id !== ctx.chatId ? ctx.from?.id : undefined,
-      message_thread_id: ctx.message?.message_thread_id ?? undefined,
+      message_thread_id:
+        ctx.message?.message_thread_id ?? ctx.callbackQuery?.message?.message_thread_id,
     });
     return true;
   }
@@ -84,7 +85,7 @@ export default async (bot: Bot) => {
       return next();
     } catch (err) {
       const error = err as Error;
-      logger.error({error:error.message});
+      logger.error({ error: error.message });
     }
   });
 
