@@ -445,7 +445,7 @@ async function downloadAndStoreEdtPdf(
   });
 
   if (section.timetableSheetName) {
-    const sheetFamily = await studySections.findStudySectionBySheetName(section.timetableSheetName);
+    const sheetFamily = await studySections.findStudySectionsBySheetName(section.timetableSheetName);
     for (const sameSheetSection of sheetFamily) {
       if (sameSheetSection.name===section.name) continue;
 

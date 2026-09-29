@@ -83,9 +83,9 @@ async function findStudySectionsByChat(chatId: number) {
   ).toArray();
 }
 
-async function findStudySectionBySheetName(sheetName:string) {
+async function findStudySectionsBySheetName(sheetName:string) {
   return collection.find({
-    timetableSheetName: sheetName,
+    timetableSheetName: { $regex: `^${sheetName}$`, $options: "i" },
   }).toArray();
 }
 
@@ -97,6 +97,6 @@ export const studySections = {
   setStudySection,
   findStudySectionByName,
   findStudySectionsByChat,
-  findStudySectionBySheetName,
+  findStudySectionsBySheetName,
   getAllStudySections,
 };

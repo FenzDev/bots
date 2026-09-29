@@ -10,6 +10,7 @@ import {
 } from "../../../repositories/resource.repository.js";
 import logger from "../../../lib/logger.js";
 import { InlineKeyboardButton } from "grammy/types";
+import { WithId } from "mongodb";
 
 export default async (bot: Bot) => {
   async function sendEdt(ctx: Context, section: StudySection) {
@@ -49,7 +50,6 @@ export default async (bot: Bot) => {
         }
       }
 
-      // TODO: know section from chat or show menu
       let sectionsOfChat = await studySections.findStudySectionsByChat(
         ctx.chat.id,
       );
@@ -63,9 +63,30 @@ export default async (bot: Bot) => {
         sectionsOfChat = await studySections.getAllStudySections();
       }
 
-      const buttons: InlineKeyboardButton[] = sectionsOfChat.map((section) => ({
-        text: section.displayShort ?? `"${section.name}"`,
-        callback_data: `edt_${section.name}`,
+      const sheets : Record<string,WithId<StudySection>> = {}; 
+
+      for (const section of sectionsOfChat) {
+        const sheetName = section.timetableSheetName ?? section.displayShort ?? section.name;
+        if (sheets[sheetName]) continue;
+
+        sheets[sheetName] = section;
+      }
+
+      const sheetsEntries = Object.entries(sheets);
+
+      if (sheetsEntries.length === 1) {
+        await sendEdt(ctx, sheetsEntries[0][1]);
+        return next();
+      }
+      
+      if (sheetsEntries.length === 0) {
+        await ctx.reply("No timetable was found :(");
+        return next();
+      }
+
+      const buttons: InlineKeyboardButton[] = sheetsEntries.map(([sheetName, section]) => ({
+        text: sheetName,
+        callback_data: `edt_${section.timetableSheetName?.toLowerCase() ?? section.name}`,
       }));
 
       const rows: InlineKeyboardButton[][] = [];
@@ -90,11 +111,14 @@ export default async (bot: Bot) => {
   });
 
   bot.callbackQuery(/^edt(?:_(.+))?$/, async (ctx, next) => {
-    const sectionName = ctx.match.at(1);
-    if (!sectionName) return next();
+    const sheetName = ctx.match.at(1);
+    if (!sheetName) return next();
 
-    const section = await studySections.findStudySectionByName(sectionName);
-    if (!section) return next();
+    const sections = await studySections.findStudySectionsBySheetName(sheetName);
+    
+    const section = (sections.length)? sections[0]: await studySections.findStudySectionByName(sheetName);
+    
+    if (!section) return;
 
     await ctx.answerCallbackQuery();
 
