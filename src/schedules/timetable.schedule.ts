@@ -34,6 +34,7 @@ import { downloadDocumentAndStoreResource } from "../services/resources/download
 import { addTextToTimetableImage } from "../services/image/addTextToTimetableImage.js";
 import { generateTimestampId } from "../utils/genid.js";
 import { WithId } from "mongodb";
+import { translateNormalizedDay } from "../services/timetable/normalizeStrings.js";
 
 cron.schedule(
   TIMETABLE_CHECK_SCHEDULE,
@@ -363,7 +364,7 @@ function diffResultToText(section: StudySection, diffs: GroupsDiff[]) {
         ? `#${section.displayShort?.toLowerCase().replaceAll(" ", "\\_")} #section`
         : groupsDiff.groups.map((g) => `#${g}`).join(" ");
 
-      const dayTime = `${groupsDiff.day} ${groupsDiff.startTime}`;
+      const dayTime = `${groupsDiff.day} ${groupsDiff.startTime} ${translateNormalizedDay(groupsDiff.day)}`;
 
       const content = `${
         groupsDiff.isPureAdd ? "➕" : groupsDiff.isPureRemove ? "➖" : "✏"

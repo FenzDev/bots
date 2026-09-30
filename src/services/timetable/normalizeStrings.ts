@@ -75,6 +75,26 @@ const days: Record<string, string> = {
   online: "Online",
 };
 
+export function translateNormalizedDay(day: string) {
+  switch (day) {
+    case ("Sunday"):
+      return 'الأحد';
+    case ("Monday"):
+      return 'الإثنين';
+    case ("Tuesday"):
+      return 'الثلثاء';
+    case ("Wednesday"):
+      return 'الأربعاء';
+    case ("Thursday"):
+      return 'الخميس';
+    case ("Saturday"):
+      return 'السبت';
+    case ("Online"):
+      return 'أونلين';
+  }
+  return '';
+}
+
 export function tryNormalizeDayString(str: string): string | undefined {
   const normalized = str
     .toLowerCase()
