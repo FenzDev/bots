@@ -367,7 +367,7 @@ function diffResultToText(section: StudySection, diffs: GroupsDiff[]) {
       const dayTime = `${groupsDiff.day} ${groupsDiff.startTime} ${translateNormalizedDay(groupsDiff.day)}`;
 
       const content = `${
-        groupsDiff.isPureAdd ? "➕" : groupsDiff.isPureRemove ? "➖" : "✏"
+        groupsDiff.isAdd ? "➕" : groupsDiff.isRemove ? "➖" : "✏"
       } ${groupsDiff.diff
         .map((d) => {
           const [prefix, postfix] =

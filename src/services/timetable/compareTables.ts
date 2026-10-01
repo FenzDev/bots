@@ -9,7 +9,9 @@ export type GroupsDiff = {
   startTime: string;
   hasAllGroups: boolean;
   isPureAdd: boolean;
+  isAdd: boolean;
   isPureRemove: boolean;
+  isRemove: boolean;
   diff: DiffPart[];
 };
 
@@ -89,8 +91,10 @@ export function compareTables(
         diff,
         groups,
         hasAllGroups: matchSection!=undefined || groups.length === groupsCount,
-        isPureAdd: false,
-        isPureRemove: false, 
+        isPureAdd: diff.every((d) => d.type === "add"),
+        isAdd: diff.some((d) => d.type === "add") && !diff.some((d)=>d.type==='remove'),
+        isPureRemove: diff.every((d) => d.type === "remove"), 
+        isRemove: diff.some((d) => d.type === "remove") && !diff.some((d)=>d.type==='add'),
       });
 
     }
@@ -99,9 +103,9 @@ export function compareTables(
 
   // sort diffs pure-removes -> pure-aditions -> mix
   const sortEval = (gDiff: GroupsDiff) =>
-    (gDiff.isPureRemove = gDiff.diff.every((d) => d.type === "remove"))
+    (gDiff.isRemove)
       ? 0
-      : (gDiff.isPureAdd = gDiff.diff.every((d) => d.type === "add"))
+      : (gDiff.isAdd)
         ? 2
         : 1;
   diffs.sort((a, b) => sortEval(a) - sortEval(b));
