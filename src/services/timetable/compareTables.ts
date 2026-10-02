@@ -3,17 +3,33 @@ import { matchPattern } from "../../utils/matchPatern.js";
 import { DiffPart, diffWords } from "./diffwords.js";
 import { Timetable } from "./parseTimetableObject.js";
 
-export type GroupsDiff = {
-  groups: string[];
+type DayTime = {
   day: string;
   startTime: string;
-  hasAllGroups: boolean;
-  isPureAdd: boolean;
-  isAdd: boolean;
-  isPureRemove: boolean;
-  isRemove: boolean;
-  diff: DiffPart[];
 };
+export type SessionUpdate = {
+  group: string;
+  isWholeSection: boolean;
+} & DayTime &
+  (
+    | {
+        type: "modify";
+
+        isPureAdd: boolean;
+        isAdd: boolean;
+        isPureRemove: boolean;
+        isRemove: boolean;
+        diff: DiffPart[];
+        oldSessionTitle: string;
+        newSessionTitle: string;
+      }
+    | {
+        type: "transfer";
+        from: DayTime;
+        to: DayTime;
+        sessionTitle: string;
+      }
+  );
 
 function areTimetableDiffsEqual(diffA: DiffPart[], diffB: DiffPart[]) {
   if (diffA.length !== diffB.length) {
@@ -33,24 +49,18 @@ export function compareTables(
   groupsHeaderPatern: string,
   groupsCount: number,
 ) {
-  const diffs: GroupsDiff[] = [];
-
-  logger.debug({ timetableA, timetableB });
-
-  
+  /// STEP 1 : Get any session that got modified
+  // session is the intersection of day, time and group
+  const diffs: (SessionUpdate & { type: "modify" })[] = [];
   for (const [dayTime, groupsSessionsB] of Object.entries(timetableB)) {
     const groupsSessionsA = timetableA[dayTime];
     if (!groupsSessionsA) continue;
-    
-    const [day,startTime] = dayTime.split('/');
-    
-    const skipped = new Set();
+
+    const [day, startTime] = dayTime.split("/");
 
     const groupsSessionsBEntries = Object.entries(groupsSessionsB);
-    for (let g = 0; g < groupsSessionsBEntries.length; g++){
-      const [tableGroup,sessionB] = groupsSessionsBEntries[g];
-
-      if (skipped.has(g)) continue;
+    for (let g = 0; g < groupsSessionsBEntries.length; g++) {
+      const [tableGroup, sessionB] = groupsSessionsBEntries[g];
 
       const matchSection = matchPattern(tableGroup, sectionHeaderPatern);
       const matchGroup = matchPattern(tableGroup, groupsHeaderPatern);
@@ -63,56 +73,56 @@ export function compareTables(
 
       const diff = diffWords(sessionA, sessionB);
 
-      if (diff.length === 0 || diff.every(diffPart=>diffPart.type==='equal')) continue;
-
-      const groups = [tableGroup];
-
-      for (let gOther = g+1; gOther < groupsSessionsBEntries.length; gOther++) {
-        if (skipped.has(gOther)) continue;
-        
-        const [otherTableGroup, otherSessionB] = groupsSessionsBEntries[gOther];
-        const otherSessionA = groupsSessionsA[otherTableGroup];
-
-        const matchOtherGroup = matchPattern(otherTableGroup, groupsHeaderPatern);
-        if (!matchOtherGroup) continue;
-
-        const otherDiff = diffWords(otherSessionA, otherSessionB);
-        
-        if (areTimetableDiffsEqual(diff, otherDiff)) {
-          groups.push(otherTableGroup);
-          skipped.add(gOther);
-        }
-
-      }
+      if (
+        diff.length === 0 ||
+        diff.every((diffPart) => diffPart.type === "equal")
+      )
+        continue;
 
       diffs.push({
+        type: "modify",
         day,
         startTime,
+        group: tableGroup,
+        isWholeSection: matchSection != undefined,
         diff,
-        groups,
-        hasAllGroups: matchSection!=undefined || groups.length === groupsCount,
+
         isPureAdd: diff.every((d) => d.type === "add"),
-        isAdd: diff.some((d) => d.type === "add") && !diff.some((d)=>d.type==='remove'),
-        isPureRemove: diff.every((d) => d.type === "remove"), 
-        isRemove: diff.some((d) => d.type === "remove") && !diff.some((d)=>d.type==='add'),
+        isAdd:
+          diff.some((d) => d.type === "add") &&
+          !diff.some((d) => d.type === "remove"),
+        isPureRemove: diff.every((d) => d.type === "remove"),
+        isRemove:
+          diff.some((d) => d.type === "remove") &&
+          !diff.some((d) => d.type === "add"),
+
+        oldSessionTitle: sessionA,
+        newSessionTitle: sessionB,
       });
-
     }
-
   }
 
+  /// STEP 2 : We look for equality in old/new session title 
+  // on each groups if we find that all of the groups of section
+  // are involved, we merge them into one chunk,
+  // then we split groups that are abnominal as a new 'modify' update. 
+  // Example: section has g1,g2,g3 
+  // g1+g2+g3: 'Lecture B' -> 'Lecture D'
+  // > make them one modification for section from Lec..B to Lec..D
+  // g1: 'Lab B' -> 'Lecture D'; g2,g3: '' -> 'Lecture D'
+  // > make one modification for section from '' to Lec..D
+  // > make one modification for g1 from Lab B to ''
+  // g2: 'Lecture C' -> 'Lab C'; g1,g3: 'Lecture C' -> ''
+  // > make one modification for g2 from '' to Lab C
+  // > make one modification for section from Lecture C to ''
+
   // sort diffs pure-removes -> pure-aditions -> mix
-  const sortEval = (gDiff: GroupsDiff) =>
-    (gDiff.isRemove)
-      ? 0
-      : (gDiff.isAdd)
-        ? 2
-        : 1;
-  diffs.sort((a, b) => sortEval(a) - sortEval(b));
+  // const sortEval = (gDiff: GroupsDiff) =>
+  //   gDiff.isRemove ? 0 : gDiff.isAdd ? 2 : 1;
+  // diffs.sort((a, b) => sortEval(a) - sortEval(b));
 
   return diffs;
 }
-
 
 // import logger from "../../lib/logger.js";
 // import { matchPattern } from "../../utils/matchPatern.js";

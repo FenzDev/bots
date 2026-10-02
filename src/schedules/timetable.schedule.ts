@@ -21,7 +21,7 @@ import { normalizeGrid } from "../services/timetable/normalizeGrid.js";
 import { parseTableGrid } from "../services/timetable/parseTableGrid.js";
 import {
   compareTables,
-  GroupsDiff,
+  SessionUpdate,
 } from "../services/timetable/compareTables.js";
 import { parseTimetableObject } from "../services/timetable/parseTimetableObject.js";
 import {
@@ -119,7 +119,7 @@ export async function checkTimetables({
     section: StudySection;
     newHash: string;
     newGridJSON?: string;
-    diffs?: GroupsDiff[];
+    diffs?: SessionUpdate[];
   };
 
   const updatedTimetables: SectionUpdate[] = [];
@@ -356,31 +356,34 @@ async function checkCSV(
   }
 }
 
-function diffResultToText(section: StudySection, diffs: GroupsDiff[]) {
+function diffResultToText(section: StudySection, sessionUpdates: SessionUpdate[]) {
   // logger.debug({ diffs, section }, "generating diff result string");
-  return diffs
-    .map((groupsDiff) => {
-      const groups = groupsDiff.hasAllGroups
+  return sessionUpdates
+    .map((sessionUpdate) => {
+      const whosInvolved = sessionUpdate.isWholeSection
         ? `#${section.displayShort?.toLowerCase().replaceAll(" ", "\\_")} #section`
-        : groupsDiff.groups.map((g) => `#${g}`).join(" ");
+        : sessionUpdate.group;
 
-      const dayTime = `${groupsDiff.day} ${groupsDiff.startTime} ${translateNormalizedDay(groupsDiff.day)}`;
+      const dayTime = `${sessionUpdate.day} ${sessionUpdate.startTime} ${translateNormalizedDay(sessionUpdate.day)}`;
+
+      if (sessionUpdate.type !== 'modify') 
+        return `> 🔴 ${whosInvolved}\n> ${dayTime}\n> NOT IMPLEMENTED`;
 
       const content = `${
-        groupsDiff.isAdd ? "➕" : groupsDiff.isRemove ? "➖" : "✏"
-      } ${groupsDiff.diff
-        .map((d) => {
+        sessionUpdate.isAdd ? "➕" : sessionUpdate.isRemove ? "➖" : "✏"
+      } ${sessionUpdate.diff
+        .map((diffPart) => {
           const [prefix, postfix] =
-            d.type === "add"
+            diffPart.type === "add"
               ? ["*__", "__*"]
-              : d.type === "remove"
+              : diffPart.type === "remove"
                 ? ["~", "~"]
                 : ["", ""];
-          return `${prefix}${escapeCommonMD(d.text)}${postfix}`.trim();
+          return `${prefix}${escapeCommonMD(diffPart.text)}${postfix}`.trim();
         })
         .join(" ")}`;
 
-      return `> 🔴 ${groups}\n> ${dayTime}\n> ${content}`;
+      return `> 🔴 ${whosInvolved}\n> ${dayTime}\n> ${content}`;
     })
     .join("\n\n");
 }
