@@ -7,6 +7,9 @@ interface DayTime {
   day: string;
   startTime: string;
 }
+
+type GroupsUpdates = Record<string,SessionUpdate[]>;
+
 export type SessionUpdate = {
   group: string;
   isWholeSection: boolean;
@@ -215,6 +218,17 @@ export function compareTables(
       expandedModifications.push(...modificationsQueue);
     }
     modificationsQueue.splice(0, modificationsQueue.length);
+  }
+
+  /// STEP 3 : We analyse the modification and we detect transformation
+  // while detecting we create the final updates for each groups
+  const groupsUpdates:GroupsUpdates = {}
+
+  for (let m = 0; m < expandedModifications.length; m++) {
+    
+    for (let mOther=m+1; mOther < expandedModifications.length; mOther++) {
+      // TODO: transformation detection
+    }
   }
 
   // sort diffs pure-removes -> pure-aditions -> mix
