@@ -57,6 +57,15 @@ cron.schedule(
   { logger },
 );
 
+type GroupsUpdates = SessionUpdate[];
+
+type SectionUpdate = {
+  section: StudySection;
+  newHash: string;
+  newGridJSON?: string;
+  groupsUpdates?: GroupsUpdates[];
+};
+
 function hashText(text: string): string {
   return createHash("sha256").update(text, "utf8").digest("hex");
 }
@@ -115,18 +124,11 @@ export async function checkTimetables({
     ? specificSections
     : await studySections.getAllStudySections();
 
-  type SectionUpdate = {
-    section: StudySection;
-    newHash: string;
-    newGridJSON?: string;
-    sessionUpdates?: SessionUpdate[];
-  };
-
   const updatedTimetables: SectionUpdate[] = [];
 
   const { timetablesId } = await runtimeConfig.get();
 
-  if (!timetablesId) throw new Error('No timetable id was specified');
+  if (!timetablesId) throw new Error("No timetable id was specified");
 
   const baseUrl = `https://docs.google.com/spreadsheets/d/${timetablesId}`;
   const baseDownloadUrl = `${baseUrl}/export`;
@@ -220,16 +222,18 @@ export async function checkTimetables({
       }
 
       // Get the diffs
-      timetable.sessionUpdates = compareTables(
-        timetableA,
-        timetableB,
-        timetable.section.timetableSectionHeaderPatern?.toLowerCase() ??
-          timetable.section.sectionLetter ??
-          "Section",
-        timetable.section.timetableGroupHeaderPatern?.toLowerCase() ??
-          `${timetable.section.sectionLetter ?? "G"}$`,
-        timetable.section.groupsCount ?? 1,
-      );
+      timetable.groupsUpdates = Object.entries(
+        compareTables(
+          timetableA,
+          timetableB,
+          timetable.section.timetableSectionHeaderPatern?.toLowerCase() ??
+            timetable.section.sectionLetter ??
+            "Section",
+          timetable.section.timetableGroupHeaderPatern?.toLowerCase() ??
+            `${timetable.section.sectionLetter ?? "G"}$`,
+          timetable.section.groupsCount ?? 1,
+        ),
+      ).map(([_, updates]) => updates);
 
       // Persist the stable hash/grid only after the debounce + comparison.
       await studySections.setStudySection({
@@ -242,12 +246,15 @@ export async function checkTimetables({
     let update: SectionUpdate | undefined;
 
     while ((update = updatedTimetables.shift())) {
-      if (!update.sessionUpdates?.length) {
-        logger.info({section:update.section.name}, "No realistic differences in any session.");
+      if (!update.groupsUpdates?.length) {
+        logger.info(
+          { section: update.section.name },
+          "No realistic differences in any session.",
+        );
         continue;
       }
 
-      logger.info({section:update.section.name},"Broadcasting the update");
+      logger.info({ section: update.section.name }, "Broadcasting the update");
 
       const pdfResource = await downloadAndStoreEdtPdf(
         update.section,
@@ -261,13 +268,13 @@ export async function checkTimetables({
 🚨📅 لقد تم تحديث جدول توقيت ${update.section.displayShort} 🚨!
 📅 Timetable of ${update.section.displayShort} was updated!
 
-${diffResultToText(update.section, update.sessionUpdates)}
+${diffResultToText(update.section, update.groupsUpdates)}
 
 [🔗source](${escapeCommonMD(sourceUrl)})`
         .trim()
         .replace(/([`#+\-=|{}.!])/g, "\\$1");
 
-      const broadcastWithoutFile = async (update:SectionUpdate) =>
+      const broadcastWithoutFile = async (update: SectionUpdate) =>
         await timetableBot.api.sendMessage(
           update.section.timetableBroadcastChatId!,
           text,
@@ -292,20 +299,23 @@ ${diffResultToText(update.section, update.sessionUpdates)}
           update.section.timetableBroadcastChatId!,
           pdfResFile.fileId,
           {
-            caption: text.length > 1024? '': text,
+            caption: text.length > 1024 ? "" : text,
             parse_mode: "MarkdownV2",
             message_thread_id:
               update.section.timetableBroadcastThreadId ?? undefined,
           },
         );
-        if (text.length>1024){
+        if (text.length > 1024) {
           await broadcastWithoutFile(update);
         }
       } else {
         await broadcastWithoutFile(update);
       }
 
-      logger.info({section:update.section.name},"Broadcasted and changed hash and grid for that");
+      logger.info(
+        { section: update.section.name },
+        "Broadcasted and changed hash and grid for that",
+      );
     }
   }
 }
@@ -359,34 +369,57 @@ async function checkCSV(
   }
 }
 
-function diffResultToText(section: StudySection, sessionUpdates: SessionUpdate[]) {
+function diffResultToText(
+  section: StudySection,
+  groupsUpdates: GroupsUpdates[],
+) {
   // logger.debug({ diffs, section }, "generating diff result string");
-  return sessionUpdates
-    .map((sessionUpdate) => {
-      const whosInvolved = sessionUpdate.isWholeSection
+  return groupsUpdates
+    .sort((a, b) =>
+      a[0].group.localeCompare(b[0].group, undefined, { sensitivity: "base" }),
+    )
+    .map((updates) => {
+      const firstUpdate = updates[0];
+      const whosInvolved = firstUpdate.isWholeSection
         ? `#${section.displayShort?.toLowerCase().replaceAll(" ", "\\_")} #section`
-        : sessionUpdate.group;
+        : `#${firstUpdate.group}`;
 
-      const dayTime = `${sessionUpdate.day} ${sessionUpdate.startTime} ${translateNormalizedDay(sessionUpdate.day)}`;
+      const updatesContent = updates
+        .map((update) => {
+          // modification update
+          if (update.type === "modify") {
+            const dayTime = `${update.day} ${update.startTime} ${translateNormalizedDay(update.day)}`;
 
-      if (sessionUpdate.type !== 'modify') 
-        return `> 🔴 ${whosInvolved}\n> ${dayTime}\n> NOT IMPLEMENTED`;
-
-      const content = `${
-        sessionUpdate.isAdd ? "➕" : sessionUpdate.isRemove ? "➖" : "✏"
-      } ${sessionUpdate.diff
-        .map((diffPart) => {
-          const [prefix, postfix] =
-            diffPart.type === "add"
-              ? ["*__", "__*"]
-              : diffPart.type === "remove"
-                ? ["~", "~"]
-                : ["", ""];
-          return `${prefix}${escapeCommonMD(diffPart.text)}${postfix}`.trim();
+            const content = `${
+              update.isAdd ? "➕" : update.isRemove ? "➖" : "✏"
+            } ${update.diff
+              .map((diffPart) => {
+                const [prefix, suffix] =
+                  diffPart.type === "add"
+                    ? ["*__", "__*"]
+                    : diffPart.type === "remove"
+                      ? ["~", "~"]
+                      : ["", ""];
+                return `${prefix}${escapeCommonMD(diffPart.text)}${suffix}`.trim();
+              })
+              .join(" ")}`;
+            return `>● ${dayTime}\n> ${content}`;
+          }
+          // transfer update
+          else {
+            const from = `${update.day.from} ${
+              update.startTime.from
+            } ${translateNormalizedDay(update.day.from)}`;
+            const to = `${update.day.to} ${
+              update.startTime.to
+            } ${translateNormalizedDay(update.day.to)}`;
+            const sessionTitle = escapeCommonMD(update.sessionTitle);
+            return `>● ~${from}~\n> ➜ *__${to}__*\n> ${sessionTitle}`;
+          }
         })
-        .join(" ")}`;
+        .join("\n>\n");
 
-      return `> 🔴 ${whosInvolved}\n> ${dayTime}\n> ${content}`;
+      return `> 🔴 ${whosInvolved}\n${updatesContent}`;
     })
     .join("\n\n");
 }
@@ -415,7 +448,6 @@ async function downloadAndStoreEdtPdf(
   section: StudySection,
   baseDownloadUrl: string,
 ): Promise<Resource | undefined> {
-
   const timestamp = formatAlgiersDate(new Date());
   const timestampNoSpaces = timestamp.replaceAll(" ", "");
   const fileName = `EDT_${section.timetableSheetName?.replaceAll(" ", "") ?? section.name} (${timestampNoSpaces}).pdf`;
@@ -431,8 +463,13 @@ async function downloadAndStoreEdtPdf(
   const timetableResource = await downloadDocumentAndStoreResource(
     `${baseDownloadUrl}?gid=${section.timetableGID}&format=pdf`,
     {
-      chatId: section.timetableStoargeChatId ?? (await runtimeConfig.get()).defaultStorageChatId!,
-      threadId: section.timetableStoargeThreadId ?? (await runtimeConfig.get()).defaultStorageThreadId ?? null,
+      chatId:
+        section.timetableStoargeChatId ??
+        (await runtimeConfig.get()).defaultStorageChatId!,
+      threadId:
+        section.timetableStoargeThreadId ??
+        (await runtimeConfig.get()).defaultStorageThreadId ??
+        null,
       fileName,
       previewFile: previewImg ? new InputFile(previewImg) : undefined,
     },
@@ -452,15 +489,16 @@ async function downloadAndStoreEdtPdf(
   });
 
   if (section.timetableSheetName) {
-    const sheetFamily = await studySections.findStudySectionsBySheetName(section.timetableSheetName);
+    const sheetFamily = await studySections.findStudySectionsBySheetName(
+      section.timetableSheetName,
+    );
     for (const sameSheetSection of sheetFamily) {
-      if (sameSheetSection.name===section.name) continue;
+      if (sameSheetSection.name === section.name) continue;
 
       await studySections.setStudySection({
         name: sameSheetSection.name,
         timetableLastStoredResourceName: timetableResource.name,
       });
-
     }
   }
 

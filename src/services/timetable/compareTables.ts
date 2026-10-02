@@ -3,36 +3,36 @@ import { matchPattern } from "../../utils/matchPatern.js";
 import { DiffPart, diffWords } from "./diffwords.js";
 import { Timetable } from "./parseTimetableObject.js";
 
-interface DayTime {
-  day: string;
-  startTime: string;
-}
+type GroupsUpdates = Record<string, SessionUpdate[]>;
 
-type GroupsUpdates = Record<string,SessionUpdate[]>;
+interface Transition {
+  from: string;
+  to: string;
+}
 
 export type SessionUpdate = {
   group: string;
   isWholeSection: boolean;
-} & DayTime &
-  (
-    | {
-        type: "modify";
-
-        isPureAdd: boolean;
-        isAdd: boolean;
-        isPureRemove: boolean;
-        isRemove: boolean;
-        diff: DiffPart[];
-        oldSessionTitle: string;
-        newSessionTitle: string;
-      }
-    | {
-        type: "transfer";
-        from: DayTime;
-        to: DayTime;
-        sessionTitle: string;
-      }
-  );
+} & (
+  | {
+      type: "modify";
+      day: string;
+      startTime: string;
+      isPureAdd: boolean;
+      isAdd: boolean;
+      isPureRemove: boolean;
+      isRemove: boolean;
+      diff: DiffPart[];
+      oldSessionTitle: string;
+      newSessionTitle: string;
+    }
+  | {
+      type: "transfer";
+      day: Transition;
+      startTime: Transition;
+      sessionTitle: string;
+    }
+);
 
 type SessionModification = SessionUpdate & { type: "modify" };
 
@@ -53,7 +53,7 @@ export function compareTables(
   sectionHeaderPatern: string,
   groupsHeaderPatern: string,
   groupsCount: number,
-) : SessionUpdate[] {
+): GroupsUpdates {
   /// STEP 1 : Get any session that got modified
   // session is the intersection of day, time and group
   const dayTimeModifications: Record<string, SessionModification[]> = {};
@@ -111,7 +111,7 @@ export function compareTables(
 
   const dayTimeModificationsEntries = Object.entries(dayTimeModifications);
   if (dayTimeModificationsEntries.length === 0) {
-    return [] as SessionUpdate[];
+    return {} as GroupsUpdates;
   }
 
   /// STEP 2 : We look for equality in old/new session title
@@ -130,6 +130,8 @@ export function compareTables(
 
   const expandedModifications: SessionModification[] = [];
 
+  const mergedModificationsSet = new Set();
+
   for (const [_, modifications] of dayTimeModificationsEntries) {
     const firstModification = modifications[0];
 
@@ -137,7 +139,7 @@ export function compareTables(
       continue;
     }
 
-    const modificationsQueue: SessionModification[] = [];
+    const splitedModificationsQueue: [number, SessionModification][] = [];
 
     // non empty that is shared across groups -> empty/non empty
     let wholeSectionChangedFromSame = modifications.length === groupsCount;
@@ -152,15 +154,18 @@ export function compareTables(
 
       if (modifications[m].newSessionTitle === "") continue;
 
-      modificationsQueue.push({
-        ...modifications[m],
-        oldSessionTitle: "",
-        diff: diffWords("", modifications[m].newSessionTitle),
-        isAdd: true,
-        isPureAdd: true,
-        isRemove: false,
-        isPureRemove: false,
-      });
+      splitedModificationsQueue.push([
+        m,
+        {
+          ...modifications[m],
+          oldSessionTitle: "",
+          diff: diffWords("", modifications[m].newSessionTitle),
+          isAdd: true,
+          isPureAdd: true,
+          isRemove: false,
+          isPureRemove: false,
+        },
+      ]);
     }
 
     if (wholeSectionChangedFromSame) {
@@ -175,9 +180,14 @@ export function compareTables(
         isAdd: false,
         isPureAdd: false,
       });
-      expandedModifications.push(...modificationsQueue);
+      splitedModificationsQueue.forEach(([m, _]) =>
+        mergedModificationsSet.add(m),
+      );
+      expandedModifications.push(
+        ...splitedModificationsQueue.map(([_, mod]) => mod),
+      );
     }
-    modificationsQueue.splice(0, modificationsQueue.length);
+    splitedModificationsQueue.splice(0, splitedModificationsQueue.length);
 
     // empty/non empty -> non empty that is shared across groups
     let wholeSectionChangedToSame = modifications.length === groupsCount;
@@ -192,15 +202,18 @@ export function compareTables(
 
       if (modifications[m].oldSessionTitle === "") continue;
 
-      modificationsQueue.push({
-        ...modifications[m],
-        newSessionTitle: "",
-        diff: diffWords(modifications[m].oldSessionTitle, ""),
-        isAdd: false,
-        isPureAdd: false,
-        isRemove: true,
-        isPureRemove: true,
-      });
+      splitedModificationsQueue.push([
+        m,
+        {
+          ...modifications[m],
+          newSessionTitle: "",
+          diff: diffWords(modifications[m].oldSessionTitle, ""),
+          isAdd: false,
+          isPureAdd: false,
+          isRemove: true,
+          isPureRemove: true,
+        },
+      ]);
     }
 
     if (wholeSectionChangedToSame) {
@@ -215,28 +228,101 @@ export function compareTables(
         isAdd: true,
         isPureAdd: true,
       });
-      expandedModifications.push(...modificationsQueue);
+      splitedModificationsQueue.forEach(([m, _]) =>
+        mergedModificationsSet.add(m),
+      );
+      expandedModifications.push(
+        ...splitedModificationsQueue.map(([_, mod]) => mod),
+      );
     }
-    modificationsQueue.splice(0, modificationsQueue.length);
+    splitedModificationsQueue.splice(0, splitedModificationsQueue.length);
+
+    // add the non merged modifications
+    if (!wholeSectionChangedFromSame && !wholeSectionChangedToSame) {
+      expandedModifications.push(
+        ...modifications.filter((_, m) => !mergedModificationsSet.has(m)),
+      );
+    }
   }
 
   /// STEP 3 : We analyse the modification and we detect transformation
   // while detecting we create the final updates for each groups
-  const groupsUpdates:GroupsUpdates = {}
+  const groupsUpdates: GroupsUpdates = {};
+
+  const addUpdate = (update: SessionUpdate) => {
+    groupsUpdates[update.group] = groupsUpdates[update.group] ?? [];
+    groupsUpdates[update.group].push(update);
+  };
 
   for (let m = 0; m < expandedModifications.length; m++) {
-    
-    for (let mOther=m+1; mOther < expandedModifications.length; mOther++) {
-      // TODO: transformation detection
+    const thisMod = expandedModifications[m];
+
+    let noTransformation = true;
+    for (let mOther = m + 1; mOther < expandedModifications.length; mOther++) {
+      // if (mOther === m) continue;
+      const otherMod = expandedModifications[mOther];
+      if (
+        (!thisMod.isWholeSection || !otherMod.isWholeSection) &&
+        thisMod.group !== otherMod.group
+      ) {
+        continue;
+      }
+
+      // from this to other
+      if (
+        thisMod.oldSessionTitle !== "" &&
+        thisMod.oldSessionTitle === otherMod.newSessionTitle
+      ) {
+        addUpdate({
+          type: "transfer",
+          group: thisMod.group,
+          isWholeSection: thisMod.isWholeSection,
+          sessionTitle: thisMod.oldSessionTitle,
+          day: {
+            from: thisMod.day,
+            to: otherMod.day,
+          },
+          startTime: {
+            from: thisMod.startTime,
+            to: otherMod.startTime,
+          },
+        });
+        noTransformation = false;
+        expandedModifications.splice(mOther, 1);
+        break;
+      }
+
+      // from other to this
+      if (
+        otherMod.oldSessionTitle !== "" &&
+        otherMod.oldSessionTitle === thisMod.newSessionTitle
+      ) {
+        addUpdate({
+          type: "transfer",
+          group: thisMod.group,
+          isWholeSection: thisMod.isWholeSection,
+          sessionTitle: thisMod.newSessionTitle,
+          day: {
+            from: otherMod.day,
+            to: thisMod.day,
+          },
+          startTime: {
+            from: otherMod.startTime,
+            to: thisMod.startTime,
+          },
+        });
+        noTransformation = false;
+        expandedModifications.splice(mOther, 1);
+        break;
+      }
+    }
+
+    if (noTransformation) {
+      addUpdate(thisMod);
     }
   }
 
-  // sort diffs pure-removes -> pure-aditions -> mix
-  // const sortEval = (gDiff: GroupsDiff) =>
-  //   gDiff.isRemove ? 0 : gDiff.isAdd ? 2 : 1;
-  // diffs.sort((a, b) => sortEval(a) - sortEval(b));
-
-  return expandedModifications;
+  return groupsUpdates;
 }
 
 // import logger from "../../lib/logger.js";
