@@ -119,7 +119,7 @@ export async function checkTimetables({
     section: StudySection;
     newHash: string;
     newGridJSON?: string;
-    diffs?: SessionUpdate[];
+    sessionUpdates?: SessionUpdate[];
   };
 
   const updatedTimetables: SectionUpdate[] = [];
@@ -220,7 +220,7 @@ export async function checkTimetables({
       }
 
       // Get the diffs
-      timetable.diffs = compareTables(
+      timetable.sessionUpdates = compareTables(
         timetableA,
         timetableB,
         timetable.section.timetableSectionHeaderPatern?.toLowerCase() ??
@@ -242,7 +242,7 @@ export async function checkTimetables({
     let update: SectionUpdate | undefined;
 
     while ((update = updatedTimetables.shift())) {
-      if (!update.diffs?.length) {
+      if (!update.sessionUpdates?.length) {
         logger.info({section:update.section.name}, "No realistic differences in any session.");
         continue;
       }
@@ -261,7 +261,7 @@ export async function checkTimetables({
 🚨📅 لقد تم تحديث جدول توقيت ${update.section.displayShort} 🚨!
 📅 Timetable of ${update.section.displayShort} was updated!
 
-${diffResultToText(update.section, update.diffs)}
+${diffResultToText(update.section, update.sessionUpdates)}
 
 [🔗source](${escapeCommonMD(sourceUrl)})`
         .trim()
@@ -292,12 +292,15 @@ ${diffResultToText(update.section, update.diffs)}
           update.section.timetableBroadcastChatId!,
           pdfResFile.fileId,
           {
-            caption: text,
+            caption: text.length > 1024? '': text,
             parse_mode: "MarkdownV2",
             message_thread_id:
               update.section.timetableBroadcastThreadId ?? undefined,
           },
         );
+        if (text.length>1024){
+          await broadcastWithoutFile(update);
+        }
       } else {
         await broadcastWithoutFile(update);
       }

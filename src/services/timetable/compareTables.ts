@@ -3,10 +3,10 @@ import { matchPattern } from "../../utils/matchPatern.js";
 import { DiffPart, diffWords } from "./diffwords.js";
 import { Timetable } from "./parseTimetableObject.js";
 
-type DayTime = {
+interface DayTime {
   day: string;
   startTime: string;
-};
+}
 export type SessionUpdate = {
   group: string;
   isWholeSection: boolean;
@@ -31,6 +31,8 @@ export type SessionUpdate = {
       }
   );
 
+type SessionModification = SessionUpdate & { type: "modify" };
+
 function areTimetableDiffsEqual(diffA: DiffPart[], diffB: DiffPart[]) {
   if (diffA.length !== diffB.length) {
     return false;
@@ -48,10 +50,10 @@ export function compareTables(
   sectionHeaderPatern: string,
   groupsHeaderPatern: string,
   groupsCount: number,
-) {
+) : SessionUpdate[] {
   /// STEP 1 : Get any session that got modified
   // session is the intersection of day, time and group
-  const diffs: (SessionUpdate & { type: "modify" })[] = [];
+  const dayTimeModifications: Record<string, SessionModification[]> = {};
   for (const [dayTime, groupsSessionsB] of Object.entries(timetableB)) {
     const groupsSessionsA = timetableA[dayTime];
     if (!groupsSessionsA) continue;
@@ -79,7 +81,9 @@ export function compareTables(
       )
         continue;
 
-      diffs.push({
+      dayTimeModifications[dayTime] = dayTimeModifications[dayTime] ?? [];
+
+      dayTimeModifications[dayTime].push({
         type: "modify",
         day,
         startTime,
@@ -102,11 +106,16 @@ export function compareTables(
     }
   }
 
-  /// STEP 2 : We look for equality in old/new session title 
+  const dayTimeModificationsEntries = Object.entries(dayTimeModifications);
+  if (dayTimeModificationsEntries.length === 0) {
+    return [] as SessionUpdate[];
+  }
+
+  /// STEP 2 : We look for equality in old/new session title
   // on each groups if we find that all of the groups of section
   // are involved, we merge them into one chunk,
-  // then we split groups that are abnominal as a new 'modify' update. 
-  // Example: section has g1,g2,g3 
+  // then we split groups that are abnominal as a new 'modify' update.
+  // Example: section has g1,g2,g3
   // g1+g2+g3: 'Lecture B' -> 'Lecture D'
   // > make them one modification for section from Lec..B to Lec..D
   // g1: 'Lab B' -> 'Lecture D'; g2,g3: '' -> 'Lecture D'
@@ -116,12 +125,104 @@ export function compareTables(
   // > make one modification for g2 from '' to Lab C
   // > make one modification for section from Lecture C to ''
 
+  const expandedModifications: SessionModification[] = [];
+
+  for (const [_, modifications] of dayTimeModificationsEntries) {
+    const firstModification = modifications[0];
+
+    if (firstModification.isWholeSection) {
+      continue;
+    }
+
+    const modificationsQueue: SessionModification[] = [];
+
+    // non empty that is shared across groups -> empty/non empty
+    let wholeSectionChangedFromSame = modifications.length === groupsCount;
+    for (let m = 0; m < modifications.length; m++) {
+      if (
+        modifications[m].oldSessionTitle === "" ||
+        firstModification.oldSessionTitle !== modifications[m].oldSessionTitle
+      ) {
+        wholeSectionChangedFromSame = false;
+        break;
+      }
+
+      if (modifications[m].newSessionTitle === "") continue;
+
+      modificationsQueue.push({
+        ...modifications[m],
+        oldSessionTitle: "",
+        diff: diffWords("", modifications[m].newSessionTitle),
+        isAdd: true,
+        isPureAdd: true,
+        isRemove: false,
+        isPureRemove: false,
+      });
+    }
+
+    if (wholeSectionChangedFromSame) {
+      expandedModifications.push({
+        ...firstModification,
+        group: sectionHeaderPatern,
+        isWholeSection: true,
+        newSessionTitle: "",
+        diff: diffWords(firstModification.oldSessionTitle, ""),
+        isRemove: true,
+        isPureRemove: true,
+        isAdd: false,
+        isPureAdd: false,
+      });
+      expandedModifications.push(...modificationsQueue);
+    }
+    modificationsQueue.splice(0, modificationsQueue.length);
+
+    // empty/non empty -> non empty that is shared across groups
+    let wholeSectionChangedToSame = modifications.length === groupsCount;
+    for (let m = 0; m < modifications.length; m++) {
+      if (
+        modifications[m].newSessionTitle === "" ||
+        firstModification.newSessionTitle !== modifications[m].newSessionTitle
+      ) {
+        wholeSectionChangedToSame = false;
+        break;
+      }
+
+      if (modifications[m].oldSessionTitle === "") continue;
+
+      modificationsQueue.push({
+        ...modifications[m],
+        newSessionTitle: "",
+        diff: diffWords(modifications[m].oldSessionTitle, ""),
+        isAdd: false,
+        isPureAdd: false,
+        isRemove: true,
+        isPureRemove: true,
+      });
+    }
+
+    if (wholeSectionChangedToSame) {
+      expandedModifications.push({
+        ...firstModification,
+        group: sectionHeaderPatern,
+        isWholeSection: true,
+        oldSessionTitle: "",
+        diff: diffWords("", firstModification.newSessionTitle),
+        isRemove: false,
+        isPureRemove: false,
+        isAdd: true,
+        isPureAdd: true,
+      });
+      expandedModifications.push(...modificationsQueue);
+    }
+    modificationsQueue.splice(0, modificationsQueue.length);
+  }
+
   // sort diffs pure-removes -> pure-aditions -> mix
   // const sortEval = (gDiff: GroupsDiff) =>
   //   gDiff.isRemove ? 0 : gDiff.isAdd ? 2 : 1;
   // diffs.sort((a, b) => sortEval(a) - sortEval(b));
 
-  return diffs;
+  return expandedModifications;
 }
 
 // import logger from "../../lib/logger.js";
