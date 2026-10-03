@@ -135,14 +135,16 @@ export function compareTables(
   for (const [_, modifications] of dayTimeModificationsEntries) {
     const firstModification = modifications[0];
 
-    if (firstModification.isWholeSection) {
+    if (firstModification.isWholeSection || modifications.length !== groupsCount) {
+      expandedModifications.push(...modifications);
       continue;
     }
 
+
     const splitedModificationsQueue: [number, SessionModification][] = [];
 
-    let wholeSectionChangedFromSame = modifications.length === groupsCount;
-    let wholeSectionChangedToSame = wholeSectionChangedFromSame;
+    let wholeSectionChangedFromSame = true;
+    let wholeSectionChangedToSame = true;
     for (let m = 0; m < modifications.length; m++) {
       // non empty that is shared across groups -> empty/non empty
       // for example all groups had old title 'Lecture A' which changed
@@ -180,7 +182,8 @@ export function compareTables(
             isPureRemove: false,
           },
         ]);
-      } else if (
+      }
+      if (
         !wholeSectionChangedToSame ||
         modifications[m].oldSessionTitle !== ""
       ) {
@@ -241,11 +244,17 @@ export function compareTables(
     }
   }
 
-  // TODO: Eleminate repeating modifications of groups that are equiv to section  
+  /// STEP 3 : Filter for any duplicates or unwanted modifications
   expandedModifications = expandedModifications.filter(
     (thisMod,m,mods) =>{
+      // ignore for section merge
       if (thisMod.isWholeSection) {
         return true;
+      }
+
+      // clear any empty diffs
+      if (thisMod.diff.length === 0) {
+        return false;
       }
 
       return m === mods.findIndex((otherMod)=>{
@@ -258,7 +267,7 @@ export function compareTables(
     } )
 
 
-  /// STEP 3 : We analyse the modification and we detect transformation
+  /// STEP 4 : We analyse the modification and we detect transformation
   // while detecting we create the final updates for each groups
   const groupsUpdates: GroupsUpdates = {};
 
