@@ -56,7 +56,7 @@ export function parseTimetableObject(grid: TableGrid): Timetable | null {
           timetable[id][group] = '\n'
         }
 
-        timetable[id][group] += session;
+        timetable[id][group] = (timetable[id][group] + session).trim();
       }
     }
   }
