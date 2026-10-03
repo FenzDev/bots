@@ -128,7 +128,7 @@ export function compareTables(
   // > make one modification for g2 from '' to Lab C
   // > make one modification for section from Lecture C to ''
 
-  const expandedModifications: SessionModification[] = [];
+  let expandedModifications: SessionModification[] = [];
 
   const mergedModificationsSet = new Set();
 
@@ -242,6 +242,21 @@ export function compareTables(
   }
 
   // TODO: Eleminate repeating modifications of groups that are equiv to section  
+  expandedModifications = expandedModifications.filter(
+    (thisMod,m,mods) =>{
+      if (thisMod.isWholeSection) {
+        return true;
+      }
+
+      return m === mods.findIndex((otherMod)=>{
+        return (otherMod.isWholeSection || thisMod.group === otherMod.group) &&
+        thisMod.day === otherMod.day && 
+        thisMod.startTime === otherMod.startTime && 
+        thisMod.oldSessionTitle === otherMod.oldSessionTitle && 
+        thisMod.newSessionTitle === otherMod.newSessionTitle
+      });
+    } )
+
 
   /// STEP 3 : We analyse the modification and we detect transformation
   // while detecting we create the final updates for each groups
