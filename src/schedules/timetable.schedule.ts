@@ -382,7 +382,7 @@ function diffResultToText(
       const firstUpdate = updates[0];
       const whosInvolved = firstUpdate.isWholeSection
         ? `#${section.displayShort?.toLowerCase().replaceAll(" ", "\\_")} #section`
-        : `#${firstUpdate.group}`;
+        : `#${escapeCommonMD(firstUpdate.group)}`;
 
       const updatesContent = updates
         .map((update) => {
