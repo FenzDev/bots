@@ -362,7 +362,7 @@ function diffResultToText(section: StudySection, diffs: GroupsDiff[]) {
     .map((groupsDiff) => {
       const groups = groupsDiff.hasAllGroups
         ? `#${section.displayShort?.toLowerCase().replaceAll(" ", "\\_")} #section`
-        : groupsDiff.groups.map((g) => `#${g}`).join(" ");
+        : groupsDiff.groups.map((g) => `#${escapeCommonMD(g)}`).join(" ");
 
       const dayTime = `${groupsDiff.day} ${groupsDiff.startTime} ${translateNormalizedDay(groupsDiff.day)}`;
 
