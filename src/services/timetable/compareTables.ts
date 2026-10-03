@@ -141,31 +141,62 @@ export function compareTables(
 
     const splitedModificationsQueue: [number, SessionModification][] = [];
 
-    // non empty that is shared across groups -> empty/non empty
     let wholeSectionChangedFromSame = modifications.length === groupsCount;
+    let wholeSectionChangedToSame = wholeSectionChangedFromSame;
     for (let m = 0; m < modifications.length; m++) {
+      // non empty that is shared across groups -> empty/non empty
+      // for example all groups had old title 'Lecture A' which changed
       if (
         modifications[m].oldSessionTitle === "" ||
         firstModification.oldSessionTitle !== modifications[m].oldSessionTitle
       ) {
         wholeSectionChangedFromSame = false;
-        break;
       }
 
-      if (modifications[m].newSessionTitle === "") continue;
+      // empty/non empty -> non empty that is shared across groups
+      // for example all groups have new title 'Lecture B' after change
+      if (
+        modifications[m].newSessionTitle === "" ||
+        firstModification.newSessionTitle !== modifications[m].newSessionTitle
+      ) {
+        wholeSectionChangedToSame = false;
+      }
 
-      splitedModificationsQueue.push([
-        m,
-        {
-          ...modifications[m],
-          oldSessionTitle: "",
-          diff: diffWords("", modifications[m].newSessionTitle),
-          isAdd: true,
-          isPureAdd: true,
-          isRemove: false,
-          isPureRemove: false,
-        },
-      ]);
+      if (wholeSectionChangedFromSame && wholeSectionChangedToSame) continue;
+
+      if (
+        !wholeSectionChangedFromSame ||
+        modifications[m].newSessionTitle !== ""
+      ) {
+        splitedModificationsQueue.push([
+          m,
+          {
+            ...modifications[m],
+            oldSessionTitle: "",
+            diff: diffWords("", modifications[m].newSessionTitle),
+            isAdd: true,
+            isPureAdd: true,
+            isRemove: false,
+            isPureRemove: false,
+          },
+        ]);
+      } else if (
+        !wholeSectionChangedToSame ||
+        modifications[m].oldSessionTitle !== ""
+      ) {
+        splitedModificationsQueue.push([
+          m,
+          {
+            ...modifications[m],
+            newSessionTitle: "",
+            diff: diffWords(modifications[m].newSessionTitle, ""),
+            isAdd: false,
+            isPureAdd: false,
+            isRemove: true,
+            isPureRemove: true,
+          },
+        ]);
+      }
     }
 
     if (wholeSectionChangedFromSame) {
@@ -180,42 +211,7 @@ export function compareTables(
         isAdd: false,
         isPureAdd: false,
       });
-      splitedModificationsQueue.forEach(([m, _]) =>
-        mergedModificationsSet.add(m),
-      );
-      expandedModifications.push(
-        ...splitedModificationsQueue.map(([_, mod]) => mod),
-      );
     }
-    splitedModificationsQueue.splice(0, splitedModificationsQueue.length);
-
-    // empty/non empty -> non empty that is shared across groups
-    let wholeSectionChangedToSame = modifications.length === groupsCount;
-    for (let m = 0; m < modifications.length; m++) {
-      if (
-        modifications[m].newSessionTitle === "" ||
-        firstModification.newSessionTitle !== modifications[m].newSessionTitle
-      ) {
-        wholeSectionChangedToSame = false;
-        break;
-      }
-
-      if (modifications[m].oldSessionTitle === "") continue;
-
-      splitedModificationsQueue.push([
-        m,
-        {
-          ...modifications[m],
-          newSessionTitle: "",
-          diff: diffWords(modifications[m].oldSessionTitle, ""),
-          isAdd: false,
-          isPureAdd: false,
-          isRemove: true,
-          isPureRemove: true,
-        },
-      ]);
-    }
-
     if (wholeSectionChangedToSame) {
       expandedModifications.push({
         ...firstModification,
@@ -228,14 +224,14 @@ export function compareTables(
         isAdd: true,
         isPureAdd: true,
       });
-      splitedModificationsQueue.forEach(([m, _]) =>
-        mergedModificationsSet.add(m),
-      );
-      expandedModifications.push(
-        ...splitedModificationsQueue.map(([_, mod]) => mod),
-      );
     }
-    splitedModificationsQueue.splice(0, splitedModificationsQueue.length);
+
+    splitedModificationsQueue.forEach(([m, _]) =>
+      mergedModificationsSet.add(m),
+    );
+    expandedModifications.push(
+      ...splitedModificationsQueue.map(([_, mod]) => mod),
+    );
 
     // add the non merged modifications
     if (!wholeSectionChangedFromSame && !wholeSectionChangedToSame) {
@@ -245,17 +241,23 @@ export function compareTables(
     }
   }
 
+  // TODO: Eleminate repeating modifications of groups that are equiv to section  
+
   /// STEP 3 : We analyse the modification and we detect transformation
   // while detecting we create the final updates for each groups
   const groupsUpdates: GroupsUpdates = {};
 
-  const addUpdate = (update: SessionUpdate) => {
+  const addedIndices = new Set();
+
+  const addUpdate = (update: SessionUpdate, index: number) => {
     groupsUpdates[update.group] = groupsUpdates[update.group] ?? [];
     groupsUpdates[update.group].push(update);
+    addedIndices.add(index);
   };
 
   for (let m = 0; m < expandedModifications.length; m++) {
     const thisMod = expandedModifications[m];
+    if (addedIndices.has(m)) continue;
 
     let noTransformation = true;
     for (let mOther = m + 1; mOther < expandedModifications.length; mOther++) {
@@ -273,20 +275,23 @@ export function compareTables(
         thisMod.oldSessionTitle !== "" &&
         thisMod.oldSessionTitle === otherMod.newSessionTitle
       ) {
-        addUpdate({
-          type: "transfer",
-          group: thisMod.group,
-          isWholeSection: thisMod.isWholeSection,
-          sessionTitle: thisMod.oldSessionTitle,
-          day: {
-            from: thisMod.day,
-            to: otherMod.day,
+        addUpdate(
+          {
+            type: "transfer",
+            group: thisMod.group,
+            isWholeSection: thisMod.isWholeSection,
+            sessionTitle: thisMod.oldSessionTitle,
+            day: {
+              from: thisMod.day,
+              to: otherMod.day,
+            },
+            startTime: {
+              from: thisMod.startTime,
+              to: otherMod.startTime,
+            },
           },
-          startTime: {
-            from: thisMod.startTime,
-            to: otherMod.startTime,
-          },
-        });
+          mOther,
+        );
         noTransformation = false;
         expandedModifications.splice(mOther, 1);
         break;
@@ -297,20 +302,23 @@ export function compareTables(
         otherMod.oldSessionTitle !== "" &&
         otherMod.oldSessionTitle === thisMod.newSessionTitle
       ) {
-        addUpdate({
-          type: "transfer",
-          group: thisMod.group,
-          isWholeSection: thisMod.isWholeSection,
-          sessionTitle: thisMod.newSessionTitle,
-          day: {
-            from: otherMod.day,
-            to: thisMod.day,
+        addUpdate(
+          {
+            type: "transfer",
+            group: thisMod.group,
+            isWholeSection: thisMod.isWholeSection,
+            sessionTitle: thisMod.newSessionTitle,
+            day: {
+              from: otherMod.day,
+              to: thisMod.day,
+            },
+            startTime: {
+              from: otherMod.startTime,
+              to: thisMod.startTime,
+            },
           },
-          startTime: {
-            from: otherMod.startTime,
-            to: thisMod.startTime,
-          },
-        });
+          mOther,
+        );
         noTransformation = false;
         expandedModifications.splice(mOther, 1);
         break;
@@ -318,7 +326,7 @@ export function compareTables(
     }
 
     if (noTransformation) {
-      addUpdate(thisMod);
+      addUpdate(thisMod, m);
     }
   }
 
