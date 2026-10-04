@@ -135,11 +135,13 @@ export function compareTables(
   for (const [_, modifications] of dayTimeModificationsEntries) {
     const firstModification = modifications[0];
 
-    if (firstModification.isWholeSection || modifications.length !== groupsCount) {
+    if (
+      firstModification.isWholeSection ||
+      modifications.length !== groupsCount
+    ) {
       expandedModifications.push(...modifications);
       continue;
     }
-
 
     const splitedModificationsQueue: [number, SessionModification][] = [];
 
@@ -244,28 +246,70 @@ export function compareTables(
     }
   }
 
+  for (let m = 0; m < expandedModifications.length; m++) {
+    const thisMod = expandedModifications[m];
+
+    for (let mOther = m + 1; mOther < expandedModifications.length; mOther++) {
+      const otherMod = expandedModifications[mOther];
+      if (
+        !thisMod.isWholeSection ||
+        !otherMod.isWholeSection ||
+        thisMod.day !== otherMod.day ||
+        thisMod.startTime !== otherMod.startTime
+      ) {
+        continue;
+      }
+
+      if (thisMod.isPureAdd && otherMod.isPureRemove) {
+        thisMod.oldSessionTitle = otherMod.oldSessionTitle;
+      } else if (thisMod.isPureRemove && otherMod.isPureAdd) {
+        thisMod.newSessionTitle = otherMod.newSessionTitle;
+      } else {
+        continue;
+      }
+
+      thisMod.diff = diffWords(
+        thisMod.oldSessionTitle,
+        thisMod.newSessionTitle,
+      );
+      thisMod.isAdd =
+        thisMod.diff.some((d) => d.type === "add") &&
+        !thisMod.diff.some((d) => d.type === "remove");
+      thisMod.isRemove =
+        !thisMod.diff.some((d) => d.type === "add") &&
+        thisMod.diff.some((d) => d.type === "remove");
+      thisMod.isPureAdd = thisMod.diff.every((d)=>d.type==='add');
+      thisMod.isPureRemove = thisMod.diff.every((d)=>d.type==='remove');
+      
+      expandedModifications.splice(mOther--, 1);
+    }
+  }
+
   /// STEP 3 : Filter for any duplicates or unwanted modifications
-  expandedModifications = expandedModifications.filter(
-    (thisMod,m,mods) =>{
-      // ignore for section merge
-      if (thisMod.isWholeSection) {
-        return true;
-      }
+  expandedModifications = expandedModifications.filter((thisMod, m, mods) => {
+    // ignore for section merge
+    if (thisMod.isWholeSection) {
+      return true;
+    }
 
-      // clear any empty diffs
-      if (thisMod.diff.length === 0) {
-        return false;
-      }
+    // clear any empty diffs
+    if (thisMod.diff.length === 0) {
+      return false;
+    }
 
-      return m === mods.findIndex((otherMod)=>{
-        return (otherMod.isWholeSection || thisMod.group === otherMod.group) &&
-        thisMod.day === otherMod.day && 
-        thisMod.startTime === otherMod.startTime && 
-        thisMod.oldSessionTitle === otherMod.oldSessionTitle && 
-        thisMod.newSessionTitle === otherMod.newSessionTitle
-      });
-    } )
-
+    return (
+      m ===
+      mods.findIndex((otherMod) => {
+        return (
+          (otherMod.isWholeSection || thisMod.group === otherMod.group) &&
+          thisMod.day === otherMod.day &&
+          thisMod.startTime === otherMod.startTime &&
+          thisMod.oldSessionTitle === otherMod.oldSessionTitle &&
+          thisMod.newSessionTitle === otherMod.newSessionTitle
+        );
+      })
+    );
+  });
 
   /// STEP 4 : We analyse the modification and we detect transformation
   // while detecting we create the final updates for each groups
