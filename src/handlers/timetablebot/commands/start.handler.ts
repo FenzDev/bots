@@ -10,7 +10,7 @@ By @moncef_fnn
 You can download current timetable as pdf
 through /edt .
 `;
-      await ctx.reply("");
+      await ctx.reply(startMsg);
 
       return next();
     });
