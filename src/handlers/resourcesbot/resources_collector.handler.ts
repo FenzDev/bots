@@ -60,7 +60,7 @@ export default async (bot: Bot) => {
   bot.on("message:text", async (ctx, next) => {
     if (ctx.chat.id === TELEGRAM_SUPERADMIN_ID) {
       await handleAdminText(bot, ctx.message);
-    } 
+    }
 
     return next();
   });
@@ -389,7 +389,8 @@ function generateRequestInlineKeyboard(
   requestMessageId: string,
   allCopyableCommand: boolean,
 ) {
-  const commandBase = `/approve ${requestMessageId} res_${moduleInfo.semester}_${moduleInfo.name}`;
+  const resNameBase = `${moduleInfo.semester}_${moduleInfo.name}`;
+  const commandBase = `/approve ${requestMessageId} ${resNameBase}`;
   return allCopyableCommand
     ? new InlineKeyboard()
         .copyText("TD", `${commandBase}_td `)
@@ -399,18 +400,25 @@ function generateRequestInlineKeyboard(
         .copyText("Exercises & Exams", `${commandBase}_exoexam `)
         .copyText("Resume", `${commandBase}_resume `)
         .row()
-        .copyText("Other", `${commandBase} `)
+        .copyText("Other", `${commandBase}_`)
         .text("❌ Ignore", "ignore")
     : new InlineKeyboard()
-        .text("TD", `td:${requestMessageId}`)
-        .text("Lecture", `cours:${requestMessageId}`)
-        .text("TP", `tp:${requestMessageId}`)
+        .text("TD", `approve:${resNameBase}_td`)
+        .text("List TDs", `list:${resNameBase}_td`)
         .row()
-        .text("Exercises & Exams", `exoexam:${requestMessageId}`)
+        .text("TP", `approve:${resNameBase}_tp`)
+        .text("List TPs", `list:${resNameBase}_tp`)
         .row()
-        .text("Resume", `resume:${requestMessageId}`)
+        .text("Lecture", `approve:${resNameBase}_cours`)
+        .text("List Lectures", `list:${resNameBase}_cours`)
         .row()
-        .copyText("Other", `${commandBase} `)
+        .text("Exercises & Exams", `approve:${resNameBase}_exoexam`)
+        .text("List Exercises...", `list:${resNameBase}_exoexam`)
+        .row()
+        .text("Resume", `approve:${resNameBase}_resume`)
+        .text("List Resumes", `list:${resNameBase}_resume`)
+        .row()
+        .copyText("Other", `approve:${commandBase}_`)
         .text("Ignore", "ignore");
 }
 
