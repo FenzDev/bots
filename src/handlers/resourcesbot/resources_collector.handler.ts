@@ -28,7 +28,7 @@ const pendingAdminBatches = new Map<string, PendingAdminBatch>();
 
 export default async (bot: Bot) => {
   bot.on("message:document", async (ctx, next) => {
-    if (ctx.from?.id === TELEGRAM_SUPERADMIN_ID) {
+    if (ctx.chat?.id === TELEGRAM_SUPERADMIN_ID) {
       await addAdminFileToBatch(bot, ctx.message);
     } else {
       await addFileAsRequest(bot, ctx.message);
@@ -38,7 +38,7 @@ export default async (bot: Bot) => {
   });
 
   bot.on("message:video", async (ctx, next) => {
-    if (ctx.from?.id === TELEGRAM_SUPERADMIN_ID) {
+    if (ctx.chat?.id === TELEGRAM_SUPERADMIN_ID) {
       await addAdminFileToBatch(bot, ctx.message);
     } else {
       await addFileAsRequest(bot, ctx.message);
@@ -48,7 +48,7 @@ export default async (bot: Bot) => {
   });
 
   bot.on("message:photo", async (ctx, next) => {
-    if (ctx.from?.id === TELEGRAM_SUPERADMIN_ID) {
+    if (ctx.chat?.id === TELEGRAM_SUPERADMIN_ID) {
       await addAdminFileToBatch(bot, ctx.message);
     } else {
       await addFileAsRequest(bot, ctx.message);
@@ -58,7 +58,7 @@ export default async (bot: Bot) => {
   });
 
   bot.on("message:text", async (ctx, next) => {
-    if (ctx.chat.id === TELEGRAM_SUPERADMIN_ID) {
+    if (ctx.chat?.id === TELEGRAM_SUPERADMIN_ID) {
       await handleAdminText(bot, ctx.message);
     }
 
@@ -394,11 +394,19 @@ function generateRequestInlineKeyboard(
   return allCopyableCommand
     ? new InlineKeyboard()
         .copyText("TD", `${commandBase}_td `)
+        .text("List TDs", `list:${resNameBase}_td`)
+        .row()
         .copyText("Lecture", `${commandBase}_cours `)
+        .text("List Lectures", `list:${resNameBase}_cours`)
+        .row()
         .copyText("TP", `${commandBase}_tp `)
+        .text("List TPs", `list:${resNameBase}_tp`)
         .row()
         .copyText("Exercises & Exams", `${commandBase}_exoexam `)
+        .text("List Exercises...", `list:${resNameBase}_exoexam`)
+        .row()
         .copyText("Resume", `${commandBase}_resume `)
+        .text("List Resumes", `list:${resNameBase}_resume`)
         .row()
         .copyText("Other", `${commandBase}_`)
         .text("❌ Ignore", "ignore")
@@ -422,13 +430,15 @@ function generateRequestInlineKeyboard(
         .text("Ignore", "ignore");
 }
 
-async function postRequest<TPreviewInput>(
+async function postRequest(
   bot: Bot,
   moduleInfo: ResourcesModule,
   resourceId: ObjectId,
   hasImages: boolean,
   preview: () => Promise<void>,
 ) {
+  logger.debug("Posting resource request");
+
   const reviewerId = moduleInfo.reviewerId ?? TELEGRAM_SUPERADMIN_ID;
 
   await preview();
@@ -505,12 +515,15 @@ function scheduleMediaGroupProcessing(
 }
 
 async function addFileAsRequest(bot: Bot, msg: SupportedMessage) {
+  logger.debug("About to add file as request");
+
   let moduleInfo = await resourcesModule.findModuleFromInputChat(
     msg.chat.id,
     msg.message_thread_id ?? null,
   );
 
   if (!moduleInfo) {
+    logger.debug("Not part of module");
     return;
   }
 
