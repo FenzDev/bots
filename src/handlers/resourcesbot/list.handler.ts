@@ -6,7 +6,7 @@ export default async (bot: Bot) => {
   bot.callbackQuery(/^list:(\w+)$/, async (ctx, next) => {
     ctx.answerCallbackQuery();
     const resFolderName = ctx.match[1];
-    if (!resFolderName) return;
+    if (!resFolderName) return next();
     const list = await resources.findResourcesByNamePrefix(resFolderName);
 
     const resBreadcrumbs = resFolderName.replaceAll("_", "»");
@@ -18,5 +18,7 @@ ${list.map(res=>res.displayName ?? res.name).join("\n")}
         `
         : `No resource found in ${resBreadcrumbs}.`,
     );
+
+    return next();
   });
 };
