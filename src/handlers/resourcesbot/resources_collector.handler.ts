@@ -409,7 +409,7 @@ function generateRequestInlineKeyboard(
         .text("List Resumes", `list:${resNameBase}_resume`)
         .row()
         .copyText("Other", `${commandBase}_`)
-        .text("❌ Ignore", "ignore")
+        .text("❌ Ignore", `ignore:${resNameBase}`)
     : new InlineKeyboard()
         .text("TD", `approve:${resNameBase}_td`)
         .text("List TDs", `list:${resNameBase}_td`)
@@ -427,7 +427,7 @@ function generateRequestInlineKeyboard(
         .text("List Resumes", `list:${resNameBase}_resume`)
         .row()
         .copyText("Other", `approve:${commandBase}_`)
-        .text("Ignore", "ignore");
+        .text("❌ Ignore", `ignore:${resNameBase}`);
 }
 
 async function postRequest(

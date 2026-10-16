@@ -39,6 +39,14 @@ async function findModuleFromName(name:string) {
     }
   );
 }
+async function findModuleFromSemesterAndName(semester:string,name:string) {
+  return collection.findOne(
+    {
+      name,
+      semester,
+    }
+  );
+}
 
 
 async function findModuleFromInputChat(chatId:number, threadId:number|null) {
@@ -69,6 +77,7 @@ async function setModule(res:ResourcesModuleInput) {
 
 export const resourcesModule = {
   findModuleFromName,
+  findModuleFromSemesterAndName,
   findModuleFromInputChat,
   setModule,
 };
