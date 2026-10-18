@@ -10,7 +10,7 @@ export default async (bot: Bot) => {
     ctx.answerCallbackQuery();
 
     if (!ctx.match[1]) return next();
-    const [semester, moduleName] = ctx.match[1].split("_");
+    const [semester, moduleName] = ctx.match[1].split("/");
     // logger.debug('Resources/ignore: Found args');
     
     const module = await resourcesModule.findModuleFromSemesterAndName(

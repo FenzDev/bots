@@ -9,7 +9,7 @@ export default async (bot: Bot) => {
     if (!resFolderName) return next();
     const list = await resources.findResourcesByNamePrefix(resFolderName);
 
-    const resBreadcrumbs = resFolderName.replaceAll("_", "»");
+    const resBreadcrumbs = resFolderName.replaceAll("/", "»");
     ctx.reply(
       list.length > 0
         ? `
