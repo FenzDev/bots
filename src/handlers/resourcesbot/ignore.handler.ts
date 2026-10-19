@@ -6,26 +6,26 @@ import { replyToMessage } from "../../helpers/reply-to-message.js";
 import logger from "../../lib/logger.js";
 
 export default async (bot: Bot) => {
-  bot.callbackQuery(/^ignore:(\w+)$/, async (ctx, next) => {
+  bot.callbackQuery(/^ignore:(.+)$/, async (ctx, next) => {
     ctx.answerCallbackQuery();
 
     if (!ctx.match[1]) return next();
     const [semester, moduleName] = ctx.match[1].split("/");
     // logger.debug('Resources/ignore: Found args');
-    
+
     const module = await resourcesModule.findModuleFromSemesterAndName(
       semester,
       moduleName,
     );
     if (!module) return next();
     // logger.debug('Resources/ignore: Found module');
-    
+
     const request = await pendings.findPendingRequestByTelegramMessage(
       module.reviewerId ?? TELEGRAM_SUPERADMIN_ID,
       ctx.callbackQuery.message!.message_id,
     );
     if (!request) return next();
-    logger.debug('Resources/ignore: Found requset');
+    logger.debug("Resources/ignore: Found requset");
 
     const success = await pendings.rejectPendingRequest(
       request._id,

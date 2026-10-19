@@ -1,9 +1,17 @@
-import { Bot } from "grammy";
+import { Bot, InlineKeyboard } from "grammy";
 import logger from "../../lib/logger.js";
-import { pendings } from "../../repositories/pending.repository.js";
+import {
+  PendingRequest,
+  pendings,
+} from "../../repositories/pending.repository.js";
+import { WithId } from "mongodb";
+import {
+  resourceFiles,
+  resources,
+} from "../../repositories/resource.repository.js";
 
 export default async (bot: Bot) => {
-  bot.callbackQuery(/^approve:(\w+)$/, async (ctx, next) => {
+  bot.callbackQuery(/^approve:(.*)$/, async (ctx, next) => {
     ctx.answerCallbackQuery();
 
     await approveRequest(
@@ -12,10 +20,9 @@ export default async (bot: Bot) => {
       ctx.match[1],
       ctx.match[2],
     );
-
     return next();
   });
-  
+
   bot.command("approve", async (ctx, next) => {
     logger.debug(ctx.match);
 
@@ -37,15 +44,63 @@ export default async (bot: Bot) => {
     reviewerId: number,
     requestMsgId: number,
     resFolderName: string,
-    resFileName?: string,
+    resCustomFileName?: string,
   ) {
-    if (
-      await pendings.findPendingRequestByTelegramMessage(
+    const pendingRequest = await pendings.findPendingRequestByTelegramMessage(
+      reviewerId,
+      requestMsgId,
+    );
+
+    if (!pendingRequest || !pendingRequest.resourceId) return;
+
+    const resourceFilesAssociated = await resourceFiles.findResourceFiles(
+      pendingRequest.resourceId,
+    );
+
+    if (resourceFilesAssociated.length < 0) return;
+
+    const resFileName = encodeURIComponent(
+      resCustomFileName ?? resourceFilesAssociated[0].fileName,
+    );
+
+    const resName = `res/${resFolderName}/${resFileName}`;
+    resources.updateResource(pendingRequest.resourceId, {
+      name: resName,
+      displayName: decodeURIComponent(resFileName),
+    });
+
+    const success = await pendings.approvePendingRequest(
+      pendingRequest._id,
+      reviewerId,
+      pendingRequest.resourceId,
+    );
+
+    if (success) {
+      await updateInlineKeyboard(reviewerId, requestMsgId);
+      bot.api.sendMessage(
         reviewerId,
-        requestMsgId,
-      )
-    ) {
-      logger.debug("Found the pending request");
+        `Request was approved:
+<code>
+${resName}
+</code>`,
+        {
+          reply_parameters: { message_id: requestMsgId },
+          parse_mode: "HTML",
+        },
+      );
+    } else {
     }
+  }
+
+  async function updateInlineKeyboard(
+    reviewerId: number,
+    requestMessageId: number,
+  ) {
+    bot.api.editMessageReplyMarkup(reviewerId, requestMessageId, {
+      reply_markup: new InlineKeyboard().copyText(
+        `Approved`,
+        requestMessageId.toString(),
+      ),
+    });
   }
 };
