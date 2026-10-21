@@ -22,6 +22,7 @@ const envSchema = z.object({
   TELEGRAM_WEBHOOK_SECRET: z.string().nonempty(),
   TELEGRAM_SUPERADMIN_ID: z.coerce.number(),
   TELEGRAM_SUPERADMIN_USERNAME: z.string(),
+  GDRIVE_BASE_ID: z.string().nonempty(),
   MONGODB_URI: z.string().nonempty(),
   DB_MAX_HISTORY_MESSAGES: z.coerce.number(),
   GOOGLE_AI_API_KEY: z.string().nonempty(),
@@ -55,12 +56,14 @@ export const {
   TELEGRAM_WEBHOOK_SECRET,
   TELEGRAM_SUPERADMIN_ID,
   TELEGRAM_SUPERADMIN_USERNAME,
-  
+
+  GDRIVE_BASE_ID,
+
   DB_MAX_HISTORY_MESSAGES,
 
   TIMETABLE_CHECK_SCHEDULE,
   TIMETABLE_CHECK_SETTLEMENT_DELAY,
-  
+
   MONGODB_URI,
   GOOGLE_AI_API_KEY,
 } = env;
