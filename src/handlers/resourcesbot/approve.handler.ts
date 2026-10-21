@@ -9,6 +9,7 @@ import {
   resourceFiles,
   resources,
 } from "../../repositories/resource.repository.js";
+import { uploadFile } from "../../services/gdrive/uploadFile.js";
 
 export default async (bot: Bot) => {
   bot.callbackQuery(/^approve:(.*)$/, async (ctx, next) => {
@@ -64,14 +65,14 @@ export default async (bot: Bot) => {
 
     if (resourceFilesAssociated.length < 0) return;
 
-    const resFileName = encodeURIComponent(
-      resCustomFileName ?? resourceFilesAssociated[0].fileName,
-    );
+    const resFileName =
+      resCustomFileName ?? resourceFilesAssociated[0].fileName;
+    const resFileNameEncoded = encodeURIComponent(resFileName);
 
-    const resName = `res/${resFolderName}/${resFileName}`;
+    const resNameEncoded = `res/${resFolderName}/${resFileNameEncoded}`;
     resources.updateResource(pendingRequest.resourceId, {
-      name: resName,
-      displayName: decodeURIComponent(resFileName),
+      name: resNameEncoded,
+      displayName: decodeURIComponent(resFileNameEncoded),
     });
 
     const success = await pendings.approvePendingRequest(
@@ -80,20 +81,37 @@ export default async (bot: Bot) => {
       pendingRequest.resourceId,
     );
 
-    if (success) {
-      await updateInlineKeyboard(reviewerId, requestMsgId);
-      bot.api.sendMessage(
-        reviewerId,
-        `Request was approved:
+    if (!success) {
+      return;
+    }
+
+    await updateInlineKeyboard(reviewerId, requestMsgId);
+    bot.api.sendMessage(
+      reviewerId,
+      `Request was approved:
 <code>
-${resName}
+${resNameEncoded}
 </code>`,
-        {
-          reply_parameters: { message_id: requestMsgId },
-          parse_mode: "HTML",
-        },
+      {
+        reply_parameters: { message_id: requestMsgId },
+        parse_mode: "HTML",
+      },
+    );
+
+    if (resourceFilesAssociated.length === 1) {
+      await uploadFile(
+        resFolderName.substring(4),
+        bot,
+        resourceFilesAssociated[0].fileId,
       );
     } else {
+      for (const resFile of resourceFilesAssociated) {
+        await uploadFile(
+          `${resFolderName.substring(4)}/${resFileName}`,
+          bot,
+          resFile.fileId,
+        );
+      }
     }
   }
 
