@@ -51,7 +51,12 @@ export default async (bot: Bot) => {
       requestMsgId,
     );
 
-    if (!pendingRequest || !pendingRequest.resourceId) return;
+    if (
+      !pendingRequest ||
+      !pendingRequest.resourceId ||
+      pendingRequest.status === "APPROVED"
+    )
+      return;
 
     const resourceFilesAssociated = await resourceFiles.findResourceFiles(
       pendingRequest.resourceId,
