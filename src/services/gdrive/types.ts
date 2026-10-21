@@ -1,15 +1,8 @@
-
-import type { drive_v3 } from "googleapis";
-
-export interface Bot {
-  drive: drive_v3.Drive;
-}
-
 export interface UploadFileSuccess {
   state: "success";
   fileId: string;
   name: string;
-  mimeType: string;
+  folderId: string;
   webViewLink?: string | null;
 }
 

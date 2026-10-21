@@ -1,84 +1,129 @@
 
-import fs from "node:fs";
+import { Bot } from "grammy";
+import { GoogleAuth } from "google-auth-library";
+import { google, drive_v3 } from "googleapis";
 import path from "node:path";
-import { google } from "googleapis";
-import mime from "mime-types";
+import { Readable } from "node:stream";
 
 import { GDRIVE_BASE_ID } from "../../config/env.js";
-import type { Bot, UploadFileResult } from "./types.js";
+import type { UploadFileResult } from "./types.js";
 
 const FOLDER_MIME_TYPE = "application/vnd.google-apps.folder";
+const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive";
 
-interface DriveFolderMetadata {
-  id?: string | null;
-  mimeType?: string | null;
-  parents?: string[] | null;
-  trashed?: boolean | null;
-}
+let driveClient: drive_v3.Drive | undefined;
 
-/**
- * Checks whether a destination folder is the base folder
- * or a descendant of it.
- */
-async function isWithinBaseFolder(
-  bot: Bot,
-  destinationFolderId: string,
-): Promise<boolean> {
-  const baseFolderId = GDRIVE_BASE_ID;
-
-  if (!baseFolderId || !destinationFolderId) {
-    return false;
-  }
-
-  let currentFolderId = destinationFolderId;
-  const visited = new Set<string>();
-
-  while (currentFolderId) {
-    if (currentFolderId === baseFolderId) {
-      return true;
-    }
-
-    // Protect against unexpected cycles or malformed metadata.
-    if (visited.has(currentFolderId)) {
-      return false;
-    }
-
-    visited.add(currentFolderId);
-
-    const response = await bot.drive.files.get({
-      fileId: currentFolderId,
-      supportsAllDrives: true,
-      fields: "id,mimeType,parents,trashed",
+function getDriveClient(): drive_v3.Drive {
+  if (!driveClient) {
+    const auth = new GoogleAuth({
+      scopes: [DRIVE_SCOPE],
     });
 
-    const folder = response.data as DriveFolderMetadata;
-
-    if (
-      folder.trashed ||
-      folder.mimeType !== FOLDER_MIME_TYPE
-    ) {
-      return false;
-    }
-
-    const parents = folder.parents ?? [];
-
-    // Drive folders have at most one parent.
-    if (parents.length === 0) {
-      return false;
-    }
-
-    currentFolderId = parents[0];
+    driveClient = google.drive({
+      version: "v3",
+      auth,
+    });
   }
 
-  return false;
+  return driveClient;
+}
+
+function escapeDriveQuery(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
 }
 
 /**
- * Uploads a local file into a folder under GDRIVE_BASE_ID.
+ * Finds an existing child folder, or creates it if it doesn't exist.
+ */
+async function getOrCreateFolder(
+  drive: drive_v3.Drive,
+  name: string,
+  parentId: string,
+): Promise<string> {
+  const escapedName = escapeDriveQuery(name);
+
+  const result = await drive.files.list({
+    q:
+      `name = '${escapedName}' and ` +
+      `mimeType = '${FOLDER_MIME_TYPE}' and ` +
+      `'${escapeDriveQuery(parentId)}' in parents and ` +
+      "trashed = false",
+    pageSize: 100,
+    orderBy: "createdTime",
+    fields: "files(id,name)",
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
+  });
+
+  const existingFolder = result.data.files?.[0];
+
+  if (existingFolder?.id) {
+    return existingFolder.id;
+  }
+
+  const created = await drive.files.create({
+    requestBody: {
+      name,
+      mimeType: FOLDER_MIME_TYPE,
+      parents: [parentId],
+    },
+    fields: "id",
+    supportsAllDrives: true,
+  });
+
+  if (!created.data.id) {
+    throw new Error(`Google Drive did not return an ID for folder "${name}".`);
+  }
+
+  return created.data.id;
+}
+
+/**
+ * Resolves a relative directory path inside GDRIVE_BASE_ID.
  *
- * @param filePath Local filesystem path to the file.
- * @param bot Bot with an authenticated Google Drive client.
- * @param fileId Destination Google Drive folder ID.
+ * Example: "s5/se" creates or reuses:
+ * GDRIVE_BASE_ID / s5 / se
+ */
+async function resolveFolderPath(
+  drive: drive_v3.Drive,
+  relativePath: string,
+): Promise<string> {
+  if (!GDRIVE_BASE_ID) {
+    throw new Error("GDRIVE_BASE_ID is not configured.");
+  }
+
+  const normalizedPath = relativePath.replace(/\\/g, "/");
+
+  if (
+    normalizedPath.startsWith("/") ||
+    /^[a-zA-Z]:/.test(normalizedPath)
+  ) {
+    throw new Error("filePath must be a relative Google Drive folder path.");
+  }
+
+  const segments = normalizedPath
+    .split("/")
+    .filter(Boolean);
+
+  if (segments.some((segment) => segment === "." || segment === "..")) {
+    throw new Error("filePath cannot contain '.' or '..' path segments.");
+  }
+
+  let parentId = GDRIVE_BASE_ID;
+
+  for (const segment of segments) {
+    parentId = await getOrCreateFolder(drive, segment, parentId);
+  }
+
+  return parentId;
+}
+
+/**
+ * Uploads a Telegram file into a relative folder inside GDRIVE_BASE_ID.
+ *
+ * @param filePath Relative Google Drive folder path, e.g. "s5/se".
+ * @param bot grammY bot that can access the Telegram file.
+ * @param fileId Telegram file_id (not file_unique_id).
  */
 export async function uploadFile(
   filePath: string,
@@ -86,6 +131,13 @@ export async function uploadFile(
   fileId: string,
 ): Promise<UploadFileResult> {
   try {
+    if (!fileId?.trim()) {
+      return {
+        state: "error",
+        error: "Telegram fileId must not be empty.",
+      };
+    }
+
     if (!filePath?.trim()) {
       return {
         state: "error",
@@ -93,10 +145,10 @@ export async function uploadFile(
       };
     }
 
-    if (!fileId?.trim()) {
+    if (!bot.token) {
       return {
         state: "error",
-        error: "Destination folder ID must not be empty.",
+        error: "The grammY bot token is not available.",
       };
     }
 
@@ -107,70 +159,85 @@ export async function uploadFile(
       };
     }
 
-    const absolutePath = path.resolve(filePath);
+    const drive = getDriveClient();
 
-    let fileStats: fs.Stats;
+    // 1. Resolve the Telegram file metadata.
+    const telegramFile = await bot.api.getFile(fileId);
 
-    try {
-      fileStats = await fs.promises.stat(absolutePath);
-    } catch {
-      return {
-        state: "error",
-        error: `Local file does not exist or cannot be accessed: ${filePath}`,
-      };
+    if (!telegramFile.file_path) {
+      throw new Error("Telegram did not return a downloadable file path.");
     }
 
-    if (!fileStats.isFile()) {
-      return {
-        state: "error",
-        error: `Path is not a regular file: ${filePath}`,
-      };
+    // 2. Download the file from Telegram.
+    const telegramUrl =
+      `https://api.telegram.org/file/bot${bot.token}/` +
+      telegramFile.file_path;
+
+    const response = await fetch(telegramUrl);
+
+    if (!response.ok) {
+      throw new Error(
+        `Telegram file download failed with HTTP ${response.status}.`,
+      );
     }
 
-    // Ensure the destination folder is inside the configured base.
-    const allowed = await isWithinBaseFolder(bot, fileId);
-
-    if (!allowed) {
-      return {
-        state: "error",
-        error:
-          "Destination folder does not belong to GDRIVE_BASE_ID, " +
-          "is not a valid folder, or is inaccessible.",
-      };
+    if (!response.body) {
+      throw new Error("Telegram returned an empty download response.");
     }
 
-    const fileName = path.basename(absolutePath);
+    // Telegram's standard Bot API currently supports downloads up to 20 MB.
+    const contentLength = Number(response.headers.get("content-length") ?? 0);
+
+    if (contentLength > 20 * 1024 * 1024) {
+      throw new Error("Telegram file exceeds the standard 20 MB download limit.");
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+
+    if (buffer.length === 0) {
+      throw new Error("The downloaded Telegram file is empty.");
+    }
+
+    if (buffer.length > 20 * 1024 * 1024) {
+      throw new Error("Telegram file exceeds the standard 20 MB download limit.");
+    }
+
+    // 3. Create any missing folders under GDRIVE_BASE_ID.
+    const destinationFolderId = await resolveFolderPath(
+      drive,
+      filePath,
+    );
+
+    // Telegram may not preserve the original filename.
+    const fileName = path.posix.basename(telegramFile.file_path);
     const mimeType =
-      mime.lookup(fileName) || "application/octet-stream";
+      response.headers.get("content-type")?.split(";")[0] ||
+      "application/octet-stream";
 
-    const response = await bot.drive.files.create({
+    // 4. Upload the content into the resolved folder.
+    const uploaded = await drive.files.create({
       requestBody: {
         name: fileName,
-        parents: [fileId],
+        parents: [destinationFolderId],
       },
       media: {
         mimeType,
-        body: fs.createReadStream(absolutePath),
+        body: Readable.from(buffer),
       },
+      fields: "id,name,webViewLink",
       supportsAllDrives: true,
-      fields: "id,name,mimeType,webViewLink",
     });
 
-    const uploaded = response.data;
-
-    if (!uploaded.id) {
-      return {
-        state: "error",
-        error: "Google Drive returned no ID for the uploaded file.",
-      };
+    if (!uploaded.data.id) {
+      throw new Error("Google Drive did not return an uploaded file ID.");
     }
 
     return {
       state: "success",
-      fileId: uploaded.id,
-      name: uploaded.name ?? fileName,
-      mimeType: uploaded.mimeType ?? mimeType,
-      webViewLink: uploaded.webViewLink,
+      fileId: uploaded.data.id,
+      name: uploaded.data.name ?? fileName,
+      folderId: destinationFolderId,
+      webViewLink: uploaded.data.webViewLink,
     };
   } catch (error: unknown) {
     const apiError = error as {
@@ -179,12 +246,11 @@ export async function uploadFile(
       response?: { status?: number };
     };
 
-    const code =
-      apiError.response?.status ?? apiError.code;
+    const code = apiError.response?.status ?? apiError.code;
 
     return {
       state: "error",
-      error: apiError.message ?? "Failed to upload file to Google Drive.",
+      error: apiError.message ?? "Failed to upload Telegram file to Google Drive.",
       ...(typeof code === "number" ? { code } : {}),
     };
   }
