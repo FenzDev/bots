@@ -100,7 +100,7 @@ ${resNameEncoded}
 
     if (resourceFilesAssociated.length === 1) {
       const uploadResult = await uploadFile(
-        resFolderName.substring(4),
+        resFolderName.substring(3),
         bot,
         resourceFilesAssociated[0].fileId,
       );
@@ -108,7 +108,7 @@ ${resNameEncoded}
     } else {
       for (const resFile of resourceFilesAssociated) {
         const uploadResult = await uploadFile(
-          `${resFolderName.substring(4)}/${resFileName}`,
+          `${resFolderName.substring(3)}/${resFileName}`,
           bot,
           resFile.fileId,
         );
