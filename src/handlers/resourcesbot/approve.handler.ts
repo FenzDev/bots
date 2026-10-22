@@ -99,18 +99,20 @@ ${resNameEncoded}
     );
 
     if (resourceFilesAssociated.length === 1) {
-      await uploadFile(
+      const uploadResult = await uploadFile(
         resFolderName.substring(4),
         bot,
         resourceFilesAssociated[0].fileId,
       );
+      logger.debug(uploadResult, "gdrive: uploaded single");
     } else {
       for (const resFile of resourceFilesAssociated) {
-        await uploadFile(
+        const uploadResult = await uploadFile(
           `${resFolderName.substring(4)}/${resFileName}`,
           bot,
           resFile.fileId,
         );
+        logger.debug(uploadResult, "gdrive: uploaded multiple");
       }
     }
   }
