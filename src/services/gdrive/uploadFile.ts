@@ -23,6 +23,7 @@ export async function uploadFile(
   filePath: string,
   bot: Bot,
   fileId: string,
+  fileName: string,
 ): Promise<UploadFileResult> {
   try {
     const env = NODE_ENV;
@@ -93,7 +94,7 @@ export async function uploadFile(
       };
     }
 
-    const fileName = telegramFile.file_path.split("/").pop() || "telegram-file";
+    // const fileName = telegramFile.file_path.split("/").pop() || "telegram-file";
 
     const mimeType =
       downloadResponse.headers.get("content-type") ||

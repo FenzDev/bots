@@ -103,6 +103,7 @@ ${resNameEncoded}
         resFolderName.substring(3),
         bot,
         resourceFilesAssociated[0].fileId,
+        resFileName,
       );
       logger.debug(uploadResult, "gdrive: uploaded single");
     } else {
@@ -111,6 +112,7 @@ ${resNameEncoded}
           `${resFolderName.substring(3)}/${resFileName}`,
           bot,
           resFile.fileId,
+          resFile.fileName,
         );
         logger.debug(uploadResult, "gdrive: uploaded multiple");
       }
