@@ -14,56 +14,47 @@ export const resourcesModuleInputSchema = z
     resourcesInputChatId: z.coerce.number().int().optional(),
 
     resourcesInputThreadId: z
-      .union([
-        z.literal("null").transform(() => null),
-        z.coerce.number().int(),
-      ])
+      .union([z.literal("null").transform(() => null), z.coerce.number().int()])
       .optional(),
   })
   .strict();
 
-export type ResourcesModuleInput = z.infer<
-  typeof resourcesModuleInputSchema
->;
+export type ResourcesModuleInput = z.infer<typeof resourcesModuleInputSchema>;
 
 export type ResourcesModule = ResourcesModuleInput & {
   insertedAt: Date;
 };
 
-const collection = db.collection<ResourcesModule>('modules');
+const collection = db.collection<ResourcesModule>("modules");
 
-async function findModuleFromName(name:string) {
-  return collection.findOne(
-    {
-      name,
-    }
-  );
+async function findModuleFromName(name: string) {
+  return collection.findOne({
+    name,
+  });
 }
-async function findModuleFromSemesterAndName(semester:string,name:string) {
-  return collection.findOne(
-    {
-      name,
-      semester,
-    }
-  );
+async function findModuleFromSemesterAndName(semester: string, name: string) {
+  return collection.findOne({
+    name,
+    semester,
+  });
 }
 
-
-async function findModuleFromInputChat(chatId:number, threadId:number|null) {
-  return collection.findOne(
-    {
-      resourcesInputChatId: chatId,
-      resourcesInputThreadId: threadId,
-    }
-  );
+async function findModuleFromInputChat(
+  chatId: number,
+  threadId: number | null,
+) {
+  return collection.findOne({
+    resourcesInputChatId: chatId,
+    resourcesInputThreadId: threadId,
+  });
 }
 
-async function setModule(res:ResourcesModuleInput) {
+async function setModule(res: ResourcesModuleInput) {
   return await collection.updateOne(
     { name: res.name },
     {
       $set: {
-        ...res
+        ...res,
       },
 
       // Only set this when creating the user
@@ -75,9 +66,14 @@ async function setModule(res:ResourcesModuleInput) {
   );
 }
 
+async function getExistingSemesters(): Promise<string[]> {
+  return collection.distinct("semester");
+}
+
 export const resourcesModule = {
   findModuleFromName,
   findModuleFromSemesterAndName,
   findModuleFromInputChat,
+  getExistingSemesters,
   setModule,
 };
