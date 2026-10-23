@@ -67,7 +67,7 @@ async function setModule(res: ResourcesModuleInput) {
 }
 
 async function getExistingSemesters(): Promise<string[]> {
-  return collection.distinct("semester");
+  return (await collection.distinct("semester")).sort();
 }
 
 export const resourcesModule = {
