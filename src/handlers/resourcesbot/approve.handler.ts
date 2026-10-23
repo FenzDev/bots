@@ -110,9 +110,9 @@ ${resNameEncoded}
         bot.api.sendMessage(
           reviewerId,
           `
-  Error ${uploadResult.code} occured for file : 
-  ${resFolderName}/${resFileName}
-  Cause: ${uploadResult.error}
+Error ${uploadResult.code} occured for file : 
+${resFolderName}/${resFileName}
+Cause: ${uploadResult.error}
           `,
           {
             parse_mode: "HTML",
