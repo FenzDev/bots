@@ -106,6 +106,19 @@ ${resNameEncoded}
         resFileName,
       );
       logger.debug(uploadResult, "gdrive: uploaded single");
+      if (!uploadResult.success) {
+        bot.api.sendMessage(
+          reviewerId,
+          `
+  Error ${uploadResult.code} occured for file : 
+  ${resFolderName}/${resFileName}
+  Cause: ${uploadResult.error}
+          `,
+          {
+            parse_mode: "HTML",
+          },
+        );
+      }
     } else {
       for (const resFile of resourceFilesAssociated) {
         const uploadResult = await uploadFile(
@@ -115,6 +128,19 @@ ${resNameEncoded}
           resFile.fileName,
         );
         logger.debug(uploadResult, "gdrive: uploaded multiple");
+        if (!uploadResult.success) {
+          bot.api.sendMessage(
+            reviewerId,
+            `
+Error ${uploadResult.code} occured for file : 
+${resFolderName}/${resFileName}/${resFile.fileName}
+Cause: ${uploadResult.error}
+            `,
+            {
+              parse_mode: "HTML",
+            },
+          );
+        }
       }
     }
   }
