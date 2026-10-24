@@ -9,7 +9,10 @@ import {
   JSONValue,
 } from "../../types.js";
 import { getMoreMessagesTool } from "./tools.js";
-import { Message, messages } from "../../../../repositories/message.repository.js";
+import {
+  Message,
+  messages,
+} from "../../../../repositories/message.repository.js";
 import { User, users } from "../../../../repositories/user.repository.js";
 import logger from "../../../../lib/logger.js";
 import { NODE_ENV, TELEGRAM_SUPERADMIN_ID } from "../../../../config/env.js";
@@ -190,7 +193,7 @@ export class ChatbotAIApp implements AIApplication<
     };
 
     return {
-      useHighThinking: NODE_ENV === 'production',
+      useHighThinking: false,
       parts: [
         {
           role: "system",
