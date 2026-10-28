@@ -3,7 +3,7 @@ import { InlineKeyboardMarkup, Message, Update } from "grammy/types";
 import logger from "../../lib/logger.js";
 import {
   ResourcesModule,
-  resourcesModule,
+  resourcesModules,
 } from "../../repositories/module.repository.js";
 import {
   ResourceFileInput,
@@ -178,7 +178,7 @@ async function handleAdminText(bot: Bot, msg: Message) {
     pendingAdminBatches.set(key, batch);
   }
 
-  const moduleInfo = await resourcesModule.findModuleFromName(
+  const moduleInfo = await resourcesModules.findModuleFromName(
     parsed.moduleName,
   );
 
@@ -220,7 +220,9 @@ async function processAdminBatch(bot: Bot, batch: PendingAdminBatch) {
     return;
   }
 
-  const moduleInfo = await resourcesModule.findModuleFromName(batch.moduleName);
+  const moduleInfo = await resourcesModules.findModuleFromName(
+    batch.moduleName,
+  );
 
   if (!moduleInfo) {
     return;
@@ -521,7 +523,7 @@ function scheduleMediaGroupProcessing(
 async function addFileAsRequest(bot: Bot, msg: SupportedMessage) {
   logger.debug("About to add file as request");
 
-  let moduleInfo = await resourcesModule.findModuleFromInputChat(
+  let moduleInfo = await resourcesModules.findModuleFromInputChat(
     msg.chat.id,
     msg.message_thread_id ?? null,
   );

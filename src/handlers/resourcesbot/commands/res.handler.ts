@@ -1,4 +1,4 @@
-import { Bot, InputFile, InputMediaBuilder } from "grammy";
+import { Bot, InlineKeyboard, InputFile, InputMediaBuilder } from "grammy";
 import {
   Resource,
   ResourceFile,
@@ -7,9 +7,13 @@ import {
 } from "../../../repositories/resource.repository.js";
 import { WithId } from "mongodb";
 import { TELEGRAM_SUPERADMIN_ID } from "../../../config/env.js";
+import { resourcesModules } from "../../../repositories/module.repository.js";
 
 export default async (bot: Bot) => {
   bot.command("res", async (ctx, next) => {
+    if (!ctx.match?.trim()) {
+    }
+
     const resFolderName = [
       "res",
       ...ctx.match.split(" ").map((part) => decodeURIComponent(part)),
@@ -178,5 +182,38 @@ export default async (bot: Bot) => {
         extra,
       );
     }
+  }
+
+  async function displayMenu() {}
+
+  async function updateMenu() {}
+
+  /**
+   *
+   * @param pathChain e.g. ["s5", "se", "td"]
+   */
+  async function getMenu(pathChain: string[]) {
+    const menu = new InlineKeyboard();
+    if (pathChain.length === 0) {
+      const semesters = await resourcesModules.getExistingSemesters();
+
+      semesters.forEach((semester, idx) => {
+        // if (idx % 2 == 0) menu.row();
+        menu.text(semester.toUpperCase(), `res:${semester}`);
+      });
+    } else if (pathChain.length === 1) {
+      const modules = await resourcesModules.findModulesFromSemester(
+        pathChain[0],
+      );
+      modules.forEach((module, idx) => {
+        if (idx % 2 == 0) menu.row();
+        menu.text(
+          module.displayShort ?? module.name.toUpperCase(),
+          `res:${pathChain[0]}:${module.name}`,
+        );
+      });
+    }
+
+    return menu;
   }
 };

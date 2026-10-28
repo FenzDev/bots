@@ -1,5 +1,7 @@
 import z from "zod";
 import { db } from "../lib/mongodb.js";
+import Module from "node:module";
+import { WithId } from "mongodb";
 
 export const resourcesModuleInputSchema = z
   .object({
@@ -66,14 +68,25 @@ async function setModule(res: ResourcesModuleInput) {
   );
 }
 
+async function findModulesFromSemester(
+  semester: string,
+): Promise<WithId<ResourcesModule>[]> {
+  return await collection
+    .find({
+      semester,
+    })
+    .toArray();
+}
+
 async function getExistingSemesters(): Promise<string[]> {
   return (await collection.distinct("semester")).sort();
 }
 
-export const resourcesModule = {
+export const resourcesModules = {
   findModuleFromName,
   findModuleFromSemesterAndName,
   findModuleFromInputChat,
+  findModulesFromSemester,
   getExistingSemesters,
   setModule,
 };

@@ -1,5 +1,5 @@
 import { Bot, InlineKeyboard } from "grammy";
-import { resourcesModule } from "../../repositories/module.repository.js";
+import { resourcesModules } from "../../repositories/module.repository.js";
 import { pendings } from "../../repositories/pending.repository.js";
 import { TELEGRAM_SUPERADMIN_ID } from "../../config/env.js";
 import { replyToMessage } from "../../helpers/reply-to-message.js";
@@ -13,7 +13,7 @@ export default async (bot: Bot) => {
     const [semester, moduleName] = ctx.match[1].split("/");
     // logger.debug('Resources/ignore: Found args');
 
-    const module = await resourcesModule.findModuleFromSemesterAndName(
+    const module = await resourcesModules.findModuleFromSemesterAndName(
       semester,
       moduleName,
     );
