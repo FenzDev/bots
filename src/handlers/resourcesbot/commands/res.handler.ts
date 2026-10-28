@@ -212,6 +212,18 @@ export default async (bot: Bot) => {
           `res:${pathChain[0]}:${module.name}`,
         );
       });
+    } else {
+      const resPrefix = `res/${pathChain.map((p) => p.toLowerCase()).join("/")}`;
+      const resourcesContained = await resources.findResourcesByNamePrefix(
+        pathChain.map((p) => p.toLowerCase()).join("/"),
+      );
+
+      resourcesContained.forEach((resource, idx) => {
+        const partName = resource.name
+          .substring(resPrefix.length)
+          .split("/")[0];
+        menu.text(partName, `res:${pathChain.join(":")}:${partName}`);
+      });
     }
 
     return menu;
