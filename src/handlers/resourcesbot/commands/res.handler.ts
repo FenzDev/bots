@@ -5,7 +5,7 @@ import {
   resourceFiles,
   resources,
 } from "../../../repositories/resource.repository.js";
-import { WithId } from "mongodb";
+import { ObjectId, WithId } from "mongodb";
 import { TELEGRAM_SUPERADMIN_ID } from "../../../config/env.js";
 import { resourcesModules } from "../../../repositories/module.repository.js";
 
@@ -219,10 +219,24 @@ export default async (bot: Bot) => {
       );
 
       resourcesContained.forEach((resource, idx) => {
-        const partName = resource.name
+        const endParts = resource.name
           .substring(resPrefix.length)
-          .split("/")[0];
-        menu.text(partName, `res:${pathChain.join(":")}:${partName}`);
+          .split("/")
+          .filter((p) => p !== "");
+
+        const targetLevelPart = endParts[0];
+
+        if (endParts.length > 1) {
+          menu.text(
+            targetLevelPart,
+            `res:${pathChain.join(":")}:${targetLevelPart}`,
+          );
+        } else {
+          menu.text(
+          `${resource.isMediaGroup? '🏞': '📄'} ${targetLevelPart}`,
+            `res:!view:${resource._id.toString()}`,
+          );
+        }
       });
     }
 
