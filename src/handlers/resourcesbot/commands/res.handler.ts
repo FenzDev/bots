@@ -1,23 +1,23 @@
-import { Bot, InlineKeyboard, InputFile, InputMediaBuilder } from "grammy";
+import { Bot, InlineKeyboard, InputFile, InputMediaBuilder } from 'grammy';
 import {
   Resource,
   ResourceFile,
   resourceFiles,
   resources,
-} from "../../../repositories/resource.repository.js";
-import { ObjectId, WithId } from "mongodb";
-import { TELEGRAM_SUPERADMIN_ID } from "../../../config/env.js";
-import { resourcesModules } from "../../../repositories/module.repository.js";
+} from '../../../repositories/resource.repository.js';
+import { ObjectId, WithId } from 'mongodb';
+import { TELEGRAM_SUPERADMIN_ID } from '../../../config/env.js';
+import { resourcesModules } from '../../../repositories/module.repository.js';
 
 export default async (bot: Bot) => {
-  bot.command("res", async (ctx, next) => {
+  bot.command('res', async (ctx, next) => {
     if (!ctx.match?.trim()) {
     }
 
     const resFolderName = [
-      "res",
-      ...ctx.match.split(" ").map((part) => decodeURIComponent(part)),
-    ].join("/");
+      'res',
+      ...ctx.match.split(' ').map((part) => decodeURIComponent(part)),
+    ].join('/');
 
     const resArray = await resources.findResourcesByNamePrefix(resFolderName);
 
@@ -58,9 +58,9 @@ export default async (bot: Bot) => {
     };
 
     const getMediaType = (file: ResourceFile) => {
-      if (file.mimeType.startsWith("image/")) return "photo" as const;
-      if (file.mimeType.startsWith("video/")) return "video" as const;
-      return "document" as const;
+      if (file.mimeType.startsWith('image/')) return 'photo' as const;
+      if (file.mimeType.startsWith('video/')) return 'video' as const;
+      return 'document' as const;
     };
 
     // EPHEMERAL MODE: never send a media group.
@@ -76,9 +76,9 @@ export default async (bot: Bot) => {
       for (const file of files) {
         const type = getMediaType(file);
 
-        if (type === "photo") {
+        if (type === 'photo') {
           await bot.api.sendPhoto(chatId, file.fileId, ephemeralExtra);
-        } else if (type === "video") {
+        } else if (type === 'video') {
           await bot.api.sendVideo(chatId, file.fileId, ephemeralExtra);
         } else {
           await bot.api.sendDocument(chatId, file.fileId, ephemeralExtra);
@@ -93,9 +93,9 @@ export default async (bot: Bot) => {
       for (const file of files) {
         const type = getMediaType(file);
 
-        if (type === "photo") {
+        if (type === 'photo') {
           await bot.api.sendPhoto(chatId, file.fileId, extra);
-        } else if (type === "video") {
+        } else if (type === 'video') {
           await bot.api.sendVideo(chatId, file.fileId, extra);
         } else {
           await bot.api.sendDocument(chatId, file.fileId, extra);
@@ -107,10 +107,10 @@ export default async (bot: Bot) => {
 
     // NORMAL MODE: split photos/videos and documents into compatible groups.
     const visualFiles = files.filter(
-      (file) => getMediaType(file) !== "document",
+      (file) => getMediaType(file) !== 'document',
     );
     const documentFiles = files.filter(
-      (file) => getMediaType(file) === "document",
+      (file) => getMediaType(file) === 'document',
     );
 
     const caption = resource.displayName || undefined;
@@ -123,7 +123,7 @@ export default async (bot: Bot) => {
         const file = batch[0];
         const type = getMediaType(file);
 
-        if (type === "photo") {
+        if (type === 'photo') {
           await bot.api.sendPhoto(chatId, file.fileId, {
             ...extra,
             caption,
@@ -142,7 +142,7 @@ export default async (bot: Bot) => {
         chatId,
         batch.map((file, index) => {
           const media =
-            getMediaType(file) === "photo"
+            getMediaType(file) === 'photo'
               ? InputMediaBuilder.photo(file.fileId)
               : InputMediaBuilder.video(file.fileId);
 
@@ -184,9 +184,38 @@ export default async (bot: Bot) => {
     }
   }
 
-  async function displayMenu() {}
+  async function displayMenu(
+    chatId: number,
+    pathChain: string[],
+    receiver_user_id?: number,
+  ) {
+    await bot.api.sendMessage(chatId, 'Resource Browser', {
+      receiver_user_id,
+      reply_markup: await getMenu(pathChain),
+    });
+  }
 
-  async function updateMenu() {}
+  async function updateMenu(
+    chatId: number,
+    msgId: number,
+    pathChain: string[],
+    receiver_user_id?: number,
+  ) {
+    if (receiver_user_id) {
+      await bot.api.editEphemeralMessageReplyMarkup(
+        chatId,
+        receiver_user_id,
+        msgId,
+        {
+          reply_markup: await getMenu(pathChain),
+        },
+      );
+    } else {
+      await bot.api.editMessageReplyMarkup(chatId, msgId, {
+        reply_markup: await getMenu(pathChain),
+      });
+    }
+  }
 
   /**
    *
@@ -213,28 +242,28 @@ export default async (bot: Bot) => {
         );
       });
     } else {
-      const resPrefix = `res/${pathChain.map((p) => p.toLowerCase()).join("/")}`;
+      const resPrefix = `res/${pathChain.map((p) => p.toLowerCase()).join('/')}`;
       const resourcesContained = await resources.findResourcesByNamePrefix(
-        pathChain.map((p) => p.toLowerCase()).join("/"),
+        pathChain.map((p) => p.toLowerCase()).join('/'),
       );
 
       resourcesContained.forEach((resource, idx) => {
         const endParts = resource.name
           .substring(resPrefix.length)
-          .split("/")
-          .filter((p) => p !== "");
+          .split('/')
+          .filter((p) => p !== '');
 
         const targetLevelPart = endParts[0];
 
         if (endParts.length > 1) {
           menu.text(
             targetLevelPart,
-            `res:${pathChain.join(":")}:${targetLevelPart}`,
+            `res:${pathChain.join(':')}:${targetLevelPart}`,
           );
         } else {
           menu.text(
-          `${resource.isMediaGroup? '🏞': '📄'} ${targetLevelPart}`,
-            `res:!view:${resource._id.toString()}`,
+            `${resource.isMediaGroup ? '🏞' : '📄'} ${targetLevelPart}`,
+            `res-view:${resource._id.toString()}`,
           );
         }
       });
