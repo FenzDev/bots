@@ -8,6 +8,7 @@ import {
 import { ObjectId, WithId } from 'mongodb';
 import { TELEGRAM_SUPERADMIN_ID } from '../../../config/env.js';
 import { resourcesModules } from '../../../repositories/module.repository.js';
+import logger from '../../../lib/logger.js';
 
 export default async (bot: Bot) => {
   bot.command('res', async (ctx, next) => {
@@ -20,6 +21,19 @@ export default async (bot: Bot) => {
     ].join('/');
 
     const resArray = await resources.findResourcesByNamePrefix(resFolderName);
+
+    if (ctx.match.trim() === '' || resArray.length === 0) {
+      await displayMenu(
+        [],
+        ctx.chat.id,
+        ctx.message?.is_topic_message
+          ? ctx.message.message_thread_id
+          : undefined,
+        ctx.chat.id !== ctx.from?.id ? ctx.from?.id : undefined,
+      );
+
+      return next();
+    }
 
     await displayResourcesList(
       resArray,
@@ -185,20 +199,32 @@ export default async (bot: Bot) => {
   }
 
   async function displayMenu(
-    chatId: number,
     pathChain: string[],
+    chatId: number,
+    threadId?: number,
     receiver_user_id?: number,
   ) {
     await bot.api.sendMessage(chatId, 'Resource Browser', {
       receiver_user_id,
       reply_markup: await getMenu(pathChain),
+      message_thread_id: threadId,
     });
   }
 
+  bot.callbackQuery(/^res:(.+)$/, async (ctx, next) => {
+    // logger.debug(ctx.match[1].split(':'), 'got res callback query');
+    await updateMenu(
+      ctx.match[1].split(':'),
+      ctx.callbackQuery.message!.message_id,
+      ctx.callbackQuery.message!.chat.id,
+      ctx.callbackQuery.message!.receiver_user?.id,
+    );
+  });
+
   async function updateMenu(
-    chatId: number,
-    msgId: number,
     pathChain: string[],
+    msgId: number,
+    chatId: number,
     receiver_user_id?: number,
   ) {
     if (receiver_user_id) {
@@ -222,6 +248,8 @@ export default async (bot: Bot) => {
    * @param pathChain e.g. ["s5", "se", "td"]
    */
   async function getMenu(pathChain: string[]) {
+    logger.debug(pathChain, 'Get Menu is being called');
+
     const menu = new InlineKeyboard();
     if (pathChain.length === 0) {
       const semesters = await resourcesModules.getExistingSemesters();
@@ -247,6 +275,8 @@ export default async (bot: Bot) => {
         pathChain.map((p) => p.toLowerCase()).join('/'),
       );
 
+      const folders = new Set<string>();
+      const files = [] as Resource[];
       resourcesContained.forEach((resource, idx) => {
         const endParts = resource.name
           .substring(resPrefix.length)
@@ -256,16 +286,22 @@ export default async (bot: Bot) => {
         const targetLevelPart = endParts[0];
 
         if (endParts.length > 1) {
-          menu.text(
-            targetLevelPart,
-            `res:${pathChain.join(':')}:${targetLevelPart}`,
-          );
+          folders.add(targetLevelPart);
         } else {
-          menu.text(
-            `${resource.isMediaGroup ? '🏞' : '📄'} ${targetLevelPart}`,
-            `res-view:${resource._id.toString()}`,
-          );
+          files.push(resource);
         }
+      });
+
+      logger.debug({resPrefix,resourcesContained,files},"getMenu for case of 2+ parts long path")
+
+      folders.forEach((folder) => {
+        menu.text(folder, `res:${pathChain.join(':')}:${folder}`);
+      });
+      files.forEach((resource) => {
+        menu.text(
+          `${resource.isMediaGroup ? '🏞' : '📄'} ${resource.displayName}`,
+          `res-view:${resource._id.toString()}`,
+        );
       });
     }
 
