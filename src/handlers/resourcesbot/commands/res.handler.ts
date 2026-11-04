@@ -56,7 +56,7 @@ export default async (bot: Bot) => {
   }
 
   async function displayResourceFiles(
-    resource: WithId<Resource>,
+    resource: Resource,
     chatId: number,
     threadId?: number,
     requesterId?: number,
@@ -213,12 +213,43 @@ export default async (bot: Bot) => {
 
   bot.callbackQuery(/^res:(.+)$/, async (ctx, next) => {
     // logger.debug(ctx.match[1].split(':'), 'got res callback query');
+    await ctx.answerCallbackQuery();
     await updateMenu(
       ctx.match[1].split(':'),
       ctx.callbackQuery.message!.message_id,
       ctx.callbackQuery.message!.chat.id,
       ctx.callbackQuery.message!.receiver_user?.id,
     );
+    return next();
+  });
+  bot.callbackQuery(/^res-view:(.+)$/, async (ctx, next) => {
+    // logger.debug(ctx.match[1].split(':'), 'got res callback query');
+    await ctx.answerCallbackQuery();
+    // await updateMenu(
+    //   ctx.match[1].split(':'),
+    //   ctx.callbackQuery.message!.message_id,
+    //   ctx.callbackQuery.message!.chat.id,
+    //   ctx.callbackQuery.message!.receiver_user?.id,
+    // );
+
+    const resId = new ObjectId(ctx.match[1]);
+    const resource = await resources.findResourceById(resId);
+    if (!resource) {
+      return next();
+    }
+    try {
+      await ctx.deleteMessage();
+    } catch (_) {}
+
+    await displayResourceFiles(
+      resource,
+      ctx.callbackQuery.message!.chat.id,
+      ctx.callbackQuery.message!.is_topic_message
+        ? ctx.callbackQuery.message!.message_thread_id
+        : undefined,
+      ctx.callbackQuery.from!.id,
+    );
+    return next();
   });
 
   async function updateMenu(
@@ -272,7 +303,7 @@ export default async (bot: Bot) => {
     } else {
       const resPrefix = `res/${pathChain.map((p) => p.toLowerCase()).join('/')}`;
       const resourcesContained = await resources.findResourcesByNamePrefix(
-        pathChain.map((p) => p.toLowerCase()).join('/'),
+        ['res', ...pathChain.map((p) => p.toLowerCase())].join('/'),
       );
 
       const folders = new Set<string>();
@@ -292,12 +323,16 @@ export default async (bot: Bot) => {
         }
       });
 
-      logger.debug({resPrefix,resourcesContained,files},"getMenu for case of 2+ parts long path")
+      logger.debug(
+        { resPrefix, resourcesContained, files },
+        'getMenu for case of 2+ parts long path',
+      );
 
       folders.forEach((folder) => {
         menu.text(folder, `res:${pathChain.join(':')}:${folder}`);
       });
       files.forEach((resource) => {
+        menu.row();
         menu.text(
           `${resource.isMediaGroup ? '🏞' : '📄'} ${resource.displayName}`,
           `res-view:${resource._id.toString()}`,
