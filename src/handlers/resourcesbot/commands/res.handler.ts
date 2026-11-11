@@ -78,7 +78,7 @@ export default async (bot: Bot) => {
     };
 
     // EPHEMERAL MODE: never send a media group.
-    if (requesterId !== undefined) {
+    if (requesterId !== undefined || requesterId === chatId) {
       const ephemeralExtra = {
         ...extra,
         receiver_user_id: requesterId,
@@ -241,6 +241,14 @@ export default async (bot: Bot) => {
       await ctx.deleteMessage();
     } catch (_) {}
 
+    logger.debug([
+      resource,
+      ctx.callbackQuery.message!.chat.id,
+      ctx.callbackQuery.message!.is_topic_message
+        ? ctx.callbackQuery.message!.message_thread_id
+        : undefined,
+      ctx.callbackQuery.from!.id,
+    ]);
     await displayResourceFiles(
       resource,
       ctx.callbackQuery.message!.chat.id,
@@ -279,7 +287,7 @@ export default async (bot: Bot) => {
    * @param pathChain e.g. ["s5", "se", "td"]
    */
   async function getMenu(pathChain: string[]) {
-    logger.debug(pathChain, 'Get Menu is being called');
+    // logger.debug(pathChain, 'Get Menu is being called');
 
     const menu = new InlineKeyboard();
     if (pathChain.length === 0) {
@@ -323,10 +331,10 @@ export default async (bot: Bot) => {
         }
       });
 
-      logger.debug(
-        { resPrefix, resourcesContained, files },
-        'getMenu for case of 2+ parts long path',
-      );
+      // logger.debug(
+      //   { resPrefix, resourcesContained, files },
+      //   'getMenu for case of 2+ parts long path',
+      // );
 
       folders.forEach((folder) => {
         menu.text(folder, `res:${pathChain.join(':')}:${folder}`);
