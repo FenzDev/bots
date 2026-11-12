@@ -78,7 +78,7 @@ export default async (bot: Bot) => {
     };
 
     // EPHEMERAL MODE: never send a media group.
-    if (requesterId !== undefined || requesterId === chatId) {
+    if (requesterId !== undefined && requesterId !== chatId) {
       const ephemeralExtra = {
         ...extra,
         receiver_user_id: requesterId,
