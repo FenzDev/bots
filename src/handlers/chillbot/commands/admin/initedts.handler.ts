@@ -11,13 +11,12 @@ export default async (bot: Bot) => {
     .command("initedts", async (ctx, next) => {
       if (!(await runtimeConfig.get()).timetablesId) return next();
 
-      logger.debug('hey :)');
 
       let numOfInitialized = 0;
       const sections = await studySections.getAllStudySections();
       for (const section of sections) {
         if (!section.timetableGID || section.timetableCurrentHash) {
-          logger.debug('out');
+          
           continue;
         }
 
@@ -27,12 +26,10 @@ export default async (bot: Bot) => {
           timetableStoargeThreadId: section.timetableStoargeThreadId ?? (await runtimeConfig.get()).defaultStorageThreadId,
         })
 
-        logger.debug('lets a go')
         await checkTimetables({
           specificSections: [section],
           forceSilentUpdate: true,
         });
-        logger.debug('done')
 
         numOfInitialized++;
       }
