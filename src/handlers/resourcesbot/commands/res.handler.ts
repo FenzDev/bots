@@ -337,7 +337,10 @@ export default async (bot: Bot) => {
       // );
 
       folders.forEach((folder) => {
-        menu.text(folder, `res:${pathChain.join(':')}:${folder}`);
+        menu.text(
+          folder[0].toUpperCase() + folder.slice(1),
+          `res:${pathChain.join(':')}:${folder}`,
+        );
       });
       files.forEach((resource) => {
         menu.row();
@@ -346,6 +349,11 @@ export default async (bot: Bot) => {
           `res-view:${resource._id.toString()}`,
         );
       });
+      menu.row();
+    }
+    if (pathChain.length > 0) {
+      menu.row();
+      menu.text('⬅ Back', `res:${pathChain.slice(0, -1).join(':')}`);
     }
 
     return menu;
