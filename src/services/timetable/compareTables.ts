@@ -1,7 +1,7 @@
-import logger from "../../lib/logger.js";
-import { matchPattern } from "../../utils/matchPatern.js";
-import { DiffPart, diffWords } from "./diffwords.js";
-import { Timetable } from "./parseTimetableObject.js";
+import logger from '../../lib/logger.js';
+import { matchPattern } from '../../utils/matchPatern.js';
+import { DiffPart, diffWords } from './diffwords.js';
+import { Timetable } from './parseTimetableObject.js';
 
 type GroupsUpdates = Record<string, SessionUpdate[]>;
 
@@ -15,7 +15,7 @@ export type SessionUpdate = {
   isWholeSection: boolean;
 } & (
   | {
-      type: "modify";
+      type: 'modify';
       day: string;
       startTime: string;
       isPureAdd: boolean;
@@ -27,14 +27,14 @@ export type SessionUpdate = {
       newSessionTitle: string;
     }
   | {
-      type: "transfer";
+      type: 'transfer';
       day: Transition;
       startTime: Transition;
       sessionTitle: string;
     }
 );
 
-type SessionModification = SessionUpdate & { type: "modify" };
+type SessionModification = SessionUpdate & { type: 'modify' };
 
 function areTimetableDiffsEqual(diffA: DiffPart[], diffB: DiffPart[]) {
   if (diffA.length !== diffB.length) {
@@ -61,7 +61,7 @@ export function compareTables(
     const groupsSessionsA = timetableA[dayTime];
     if (!groupsSessionsA) continue;
 
-    const [day, startTime] = dayTime.split("/");
+    const [day, startTime] = dayTime.split('/');
 
     const groupsSessionsBEntries = Object.entries(groupsSessionsB);
     for (let g = 0; g < groupsSessionsBEntries.length; g++) {
@@ -80,28 +80,28 @@ export function compareTables(
 
       if (
         diff.length === 0 ||
-        diff.every((diffPart) => diffPart.type === "equal")
+        diff.every((diffPart) => diffPart.type === 'equal')
       )
         continue;
 
       dayTimeModifications[dayTime] = dayTimeModifications[dayTime] ?? [];
 
       dayTimeModifications[dayTime].push({
-        type: "modify",
+        type: 'modify',
         day,
         startTime,
         group: tableGroup,
         isWholeSection: matchSection != undefined,
         diff,
 
-        isPureAdd: diff.every((d) => d.type === "add"),
+        isPureAdd: diff.every((d) => d.type === 'add'),
         isAdd:
-          diff.some((d) => d.type === "add") &&
-          !diff.some((d) => d.type === "remove"),
-        isPureRemove: diff.every((d) => d.type === "remove"),
+          diff.some((d) => d.type === 'add') &&
+          !diff.some((d) => d.type === 'remove'),
+        isPureRemove: diff.every((d) => d.type === 'remove'),
         isRemove:
-          diff.some((d) => d.type === "remove") &&
-          !diff.some((d) => d.type === "add"),
+          diff.some((d) => d.type === 'remove') &&
+          !diff.some((d) => d.type === 'add'),
 
         oldSessionTitle: sessionA,
         newSessionTitle: sessionB,
@@ -151,7 +151,7 @@ export function compareTables(
       // non empty that is shared across groups -> empty/non empty
       // for example all groups had old title 'Lecture A' which changed
       if (
-        modifications[m].oldSessionTitle === "" ||
+        modifications[m].oldSessionTitle === '' ||
         firstModification.oldSessionTitle !== modifications[m].oldSessionTitle
       ) {
         wholeSectionChangedFromSame = false;
@@ -160,7 +160,7 @@ export function compareTables(
       // empty/non empty -> non empty that is shared across groups
       // for example all groups have new title 'Lecture B' after change
       if (
-        modifications[m].newSessionTitle === "" ||
+        modifications[m].newSessionTitle === '' ||
         firstModification.newSessionTitle !== modifications[m].newSessionTitle
       ) {
         wholeSectionChangedToSame = false;
@@ -170,14 +170,14 @@ export function compareTables(
 
       if (
         !wholeSectionChangedFromSame ||
-        modifications[m].newSessionTitle !== ""
+        modifications[m].newSessionTitle !== ''
       ) {
         splitedModificationsQueue.push([
           m,
           {
             ...modifications[m],
-            oldSessionTitle: "",
-            diff: diffWords("", modifications[m].newSessionTitle),
+            oldSessionTitle: '',
+            diff: diffWords('', modifications[m].newSessionTitle),
             isAdd: true,
             isPureAdd: true,
             isRemove: false,
@@ -187,14 +187,14 @@ export function compareTables(
       }
       if (
         !wholeSectionChangedToSame ||
-        modifications[m].oldSessionTitle !== ""
+        modifications[m].oldSessionTitle !== ''
       ) {
         splitedModificationsQueue.push([
           m,
           {
             ...modifications[m],
-            newSessionTitle: "",
-            diff: diffWords(modifications[m].newSessionTitle, ""),
+            newSessionTitle: '',
+            diff: diffWords(modifications[m].newSessionTitle, ''),
             isAdd: false,
             isPureAdd: false,
             isRemove: true,
@@ -209,8 +209,8 @@ export function compareTables(
         ...firstModification,
         group: sectionHeaderPatern,
         isWholeSection: true,
-        newSessionTitle: "",
-        diff: diffWords(firstModification.oldSessionTitle, ""),
+        newSessionTitle: '',
+        diff: diffWords(firstModification.oldSessionTitle, ''),
         isRemove: true,
         isPureRemove: true,
         isAdd: false,
@@ -222,8 +222,8 @@ export function compareTables(
         ...firstModification,
         group: sectionHeaderPatern,
         isWholeSection: true,
-        oldSessionTitle: "",
-        diff: diffWords("", firstModification.newSessionTitle),
+        oldSessionTitle: '',
+        diff: diffWords('', firstModification.newSessionTitle),
         isRemove: false,
         isPureRemove: false,
         isAdd: true,
@@ -273,14 +273,14 @@ export function compareTables(
         thisMod.newSessionTitle,
       );
       thisMod.isAdd =
-        thisMod.diff.some((d) => d.type === "add") &&
-        !thisMod.diff.some((d) => d.type === "remove");
+        thisMod.diff.some((d) => d.type === 'add') &&
+        !thisMod.diff.some((d) => d.type === 'remove');
       thisMod.isRemove =
-        !thisMod.diff.some((d) => d.type === "add") &&
-        thisMod.diff.some((d) => d.type === "remove");
-      thisMod.isPureAdd = thisMod.diff.every((d)=>d.type==='add');
-      thisMod.isPureRemove = thisMod.diff.every((d)=>d.type==='remove');
-      
+        !thisMod.diff.some((d) => d.type === 'add') &&
+        thisMod.diff.some((d) => d.type === 'remove');
+      thisMod.isPureAdd = thisMod.diff.every((d) => d.type === 'add');
+      thisMod.isPureRemove = thisMod.diff.every((d) => d.type === 'remove');
+
       expandedModifications.splice(mOther--, 1);
     }
   }
@@ -340,12 +340,12 @@ export function compareTables(
 
       // from this to other
       if (
-        thisMod.oldSessionTitle !== "" &&
+        thisMod.oldSessionTitle !== '' &&
         thisMod.oldSessionTitle === otherMod.newSessionTitle
       ) {
         addUpdate(
           {
-            type: "transfer",
+            type: 'transfer',
             group: thisMod.group,
             isWholeSection: thisMod.isWholeSection,
             sessionTitle: thisMod.oldSessionTitle,
@@ -367,12 +367,12 @@ export function compareTables(
 
       // from other to this
       if (
-        otherMod.oldSessionTitle !== "" &&
+        otherMod.oldSessionTitle !== '' &&
         otherMod.oldSessionTitle === thisMod.newSessionTitle
       ) {
         addUpdate(
           {
-            type: "transfer",
+            type: 'transfer',
             group: thisMod.group,
             isWholeSection: thisMod.isWholeSection,
             sessionTitle: thisMod.newSessionTitle,
@@ -398,6 +398,13 @@ export function compareTables(
     }
   }
 
+  const sortEval = (update: SessionUpdate) =>
+    update.type === 'transfer' ? 0 : update.isRemove ? 1 : update.isAdd ? 2 : 3;
+
+  Object.entries(groupsUpdates).forEach(([_, updates]) =>
+    updates.sort((a, b) => sortEval(a) - sortEval(b)),
+  );
+  
   return groupsUpdates;
 }
 

@@ -336,12 +336,14 @@ export default async (bot: Bot) => {
       //   'getMenu for case of 2+ parts long path',
       // );
 
-      folders.forEach((folder) => {
-        menu.text(
-          folder[0].toUpperCase() + folder.slice(1),
-          `res:${pathChain.join(':')}:${folder}`,
-        );
+      folders.forEach((folder, idx) => {
+        const folderName =
+          folder.length > 2
+            ? folder[0].toUpperCase() + folder.slice(1)
+            : folder.toUpperCase();
+        menu.text(folderName, `res:${pathChain.join(':')}:${folder}`);
       });
+      menu.toFlowed(2);
       files.forEach((resource) => {
         menu.row();
         menu.text(
