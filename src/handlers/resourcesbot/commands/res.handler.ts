@@ -354,11 +354,11 @@ export default async (bot: Bot) => {
       menu.row();
     }
     if (pathChain.length > 0) {
-      menu.text('⬅ Back', `res:${pathChain.slice(0, -1).join(':')}`);
-      if (pathChain.length > 1) {
-        menu.text('🏠 Home', `res:`);
-      }
       menu.row();
+      if (pathChain.length > 1) {
+        menu.text('⬅ Back', `res:${pathChain.slice(0, -1).join(':')}`);
+      }
+      menu.text('🏠 Home', `res:`);
     }
 
     return menu;
