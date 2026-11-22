@@ -211,12 +211,12 @@ export default async (bot: Bot) => {
     });
   }
 
-  bot.callbackQuery(/^res:(.+)$/, async (ctx, next) => {
+  bot.callbackQuery(/^res:(.*)$/, async (ctx, next) => {
     // logger.debug(ctx.match[1].split(':'), 'got res callback query');
     await ctx.answerCallbackQuery();
     await updateMenu(
       ctx.match[1].split(':'),
-      ctx.callbackQuery.message!.message_id,
+      ctx.callbackQuery.message!.message_id,            
       ctx.callbackQuery.message!.chat.id,
       ctx.callbackQuery.message!.receiver_user?.id,
     );
