@@ -215,8 +215,9 @@ export default async (bot: Bot) => {
     // logger.debug(ctx.match[1].split(':'), 'got res callback query');
     await ctx.answerCallbackQuery();
     await updateMenu(
-      ctx.match[1].split(':').filter(path=>path.trim() !== ''),
-      ctx.callbackQuery.message!.ephemeral_message_id ?? ctx.callbackQuery.message!.message_id,            
+      ctx.match[1].split(':').filter((path) => path.trim() !== ''),
+      ctx.callbackQuery.message!.ephemeral_message_id ??
+        ctx.callbackQuery.message!.message_id,
       ctx.callbackQuery.message!.chat.id,
       ctx.callbackQuery.message!.receiver_user?.id,
     );
@@ -238,7 +239,11 @@ export default async (bot: Bot) => {
       return next();
     }
     try {
-      await ctx.deleteMessage();
+      if (ctx.callbackQuery.message!.ephemeral_message_id) {
+        await ctx.deleteEphemeralMessage();
+      } else {
+        await ctx.deleteMessage();
+      }
     } catch (_) {}
 
     logger.debug([
