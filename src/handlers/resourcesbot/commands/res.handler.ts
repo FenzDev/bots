@@ -223,6 +223,17 @@ export default async (bot: Bot) => {
     );
     return next();
   });
+  bot.callbackQuery(/^delete-msg$/, async (ctx, next) => {
+    await ctx.answerCallbackQuery();
+    try {
+      if (ctx.callbackQuery.message!.ephemeral_message_id) {
+        await ctx.deleteEphemeralMessage();
+      } else {
+        await ctx.deleteMessage();
+      }
+    } catch (_) {}
+    return next();
+  });
   bot.callbackQuery(/^res-view:(.+)$/, async (ctx, next) => {
     // logger.debug(ctx.match[1].split(':'), 'got res callback query');
     await ctx.answerCallbackQuery();
@@ -365,6 +376,7 @@ export default async (bot: Bot) => {
       }
       menu.text('🏠 Home', `res:`);
     }
+    menu.text('❌ Exit', `delete-msg`);
 
     return menu;
   }
