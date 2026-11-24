@@ -223,6 +223,43 @@ export default async (bot: Bot) => {
     );
     return next();
   });
+  bot.callbackQuery(/^res-view-all:(.*)$/, async (ctx, next) => {
+    // logger.debug(ctx.match[1].split(':'), 'got res callback query');
+    await ctx.answerCallbackQuery();
+
+    const resPrefix = `res/${ctx.match[1].split(':').join('/')}`;
+
+    const resArray = (await resources.findResourcesByNamePrefix(resPrefix)).filter((resource)=>{
+      const endParts = resource.name
+        .substring(resPrefix.length)
+        .split('/')
+        .filter((p) => p !== '');
+      return endParts.length === 1;
+    });
+
+    if (resArray.length === 0) {
+      return next();
+    }
+
+    try {
+      if (ctx.callbackQuery.message!.ephemeral_message_id) {
+        await ctx.deleteEphemeralMessage();
+      } else {
+        await ctx.deleteMessage();
+      }
+    } catch (_) {}
+    
+    await displayResourceFiles(
+      resArray[0],
+      ctx.callbackQuery.message!.chat.id,
+      ctx.callbackQuery.message!.is_topic_message
+        ? ctx.callbackQuery.message!.message_thread_id
+        : undefined,
+      ctx.callbackQuery.from!.id,
+    );
+
+    return next();
+  });
   bot.callbackQuery(/^delete-msg$/, async (ctx, next) => {
     await ctx.answerCallbackQuery();
     try {
@@ -369,8 +406,8 @@ export default async (bot: Bot) => {
       });
       menu.row();
     }
+    menu.row();
     if (pathChain.length > 0) {
-      menu.row();
       if (pathChain.length > 1) {
         menu.text('⬅ Back', `res:${pathChain.slice(0, -1).join(':')}`);
       }
