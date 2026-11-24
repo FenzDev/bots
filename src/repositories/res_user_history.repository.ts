@@ -8,7 +8,7 @@ const HISTORY_LIMIT = 3;
 export type UserResHistory = {
   telegramId: number;
   path: string;
-  //   displayName?: string;
+  displayName?: string;
   insertedAt: Date;
 };
 
@@ -16,13 +16,21 @@ const collection: Collection<UserResHistory> =
   db.collection<UserResHistory>('userResHistory');
 
 async function addUserHistory(input: Omit<UserResHistory, 'insertedAt'>) {
-  const result = await collection.insertOne({
-    telegramId: input.telegramId,
-    path: input.path,
-    // displayName: user.displayName,
-
-    insertedAt: new Date(),
-  });
+  const result = await collection.updateOne(
+    {
+      telegramId: input.telegramId,
+      path: input.path,
+    },
+    {
+      $set: {
+        displayName: input.displayName,
+      },
+      $setOnInsert: {
+        insertedAt: new Date(),
+      },
+    },
+    { upsert: true },
+  );
 
   if (
     (await collection.countDocuments({ telegramId: input.telegramId })) >

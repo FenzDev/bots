@@ -445,7 +445,7 @@ export default async (bot: Bot) => {
         logger.error(historyItem, 'history item');
 
         const resFolder = historyItem.path.split('/').slice(0, -1);
-        menu.text(`🕘 ${resFolder.join('»')}`, `res:${resFolder.join(':')}`);
+        menu.text(`🕘 ${resFolder.join('»')}`, `${resFolder.join(':')}`);
         menu.row();
       });
     }
