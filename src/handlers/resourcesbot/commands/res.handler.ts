@@ -9,6 +9,7 @@ import { ObjectId, WithId } from 'mongodb';
 import { TELEGRAM_SUPERADMIN_ID } from '../../../config/env.js';
 import { resourcesModules } from '../../../repositories/module.repository.js';
 import logger from '../../../lib/logger.js';
+import { userResHistory } from '../../../repositories/res_user_history.repository.js';
 
 export default async (bot: Bot) => {
   bot.command('res', async (ctx, next) => {
@@ -204,9 +205,13 @@ export default async (bot: Bot) => {
     threadId?: number,
     receiver_user_id?: number,
   ) {
-    await bot.api.sendMessage(chatId, 'Resource Browser', {
+    const { menu, title } = await getMenu(
+      receiver_user_id ?? chatId,
+      pathChain,
+    );
+    await bot.api.sendMessage(chatId, title, {
       receiver_user_id,
-      reply_markup: await getMenu(pathChain),
+      reply_markup: menu,
       message_thread_id: threadId,
     });
   }
@@ -262,6 +267,11 @@ export default async (bot: Bot) => {
       );
     });
 
+    await userResHistory.addUserHistory({
+      telegramId: ctx.callbackQuery.from!.id,
+      path: resPrefix,
+    });
+
     return next();
   });
   bot.callbackQuery(/^delete-msg$/, async (ctx, next) => {
@@ -314,6 +324,12 @@ export default async (bot: Bot) => {
         : undefined,
       ctx.callbackQuery.from!.id,
     );
+
+    await userResHistory.addUserHistory({
+      telegramId: ctx.callbackQuery.from!.id,
+      path: resource.name.split('/').slice(1).join('/'),
+    });
+
     return next();
   });
 
@@ -324,17 +340,19 @@ export default async (bot: Bot) => {
     receiver_user_id?: number,
   ) {
     if (receiver_user_id) {
-      await bot.api.editEphemeralMessageReplyMarkup(
+      const { menu, title } = await getMenu(receiver_user_id, pathChain);
+      await bot.api.editEphemeralMessageText(
         chatId,
         receiver_user_id,
         msgId,
-        {
-          reply_markup: await getMenu(pathChain),
+        title, {
+          reply_markup: menu,
         },
       );
     } else {
-      await bot.api.editMessageReplyMarkup(chatId, msgId, {
-        reply_markup: await getMenu(pathChain),
+      const { menu, title } = await getMenu(chatId, pathChain);
+      await bot.api.editMessageText(chatId, msgId, title,{
+        reply_markup: menu,
       });
     }
   }
@@ -343,7 +361,7 @@ export default async (bot: Bot) => {
    *
    * @param pathChain e.g. ["s5", "se", "td"]
    */
-  async function getMenu(pathChain: string[]) {
+  async function getMenu(callerId: number, pathChain: string[]) {
     // logger.debug(pathChain, 'Get Menu is being called');
 
     const menu = new InlineKeyboard();
@@ -420,9 +438,23 @@ export default async (bot: Bot) => {
         menu.text('⬅ Back', `res:${pathChain.slice(0, -1).join(':')}`);
       }
       menu.text('🏠 Home', `res:`);
+    } else {
+      const history = await userResHistory.findUserHistoryById(callerId);
+
+      history.forEach((historyItem) => {
+        logger.error(historyItem, 'history item');
+
+        const resFolder = historyItem.path.split('/').slice(0, -1);
+        menu.text(`🕘 ${resFolder.join('»')}`, `res:${resFolder.join(':')}`);
+        menu.row();
+      });
     }
+
     menu.text('❌ Exit', `delete-msg`);
 
-    return menu;
+    return {
+      menu,
+      title: pathChain.length > 0 ? pathChain.join('»') : 'Resource Browser',
+    };
   }
 };
