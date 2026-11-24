@@ -229,7 +229,9 @@ export default async (bot: Bot) => {
 
     const resPrefix = `res/${ctx.match[1].split(':').join('/')}`;
 
-    const resArray = (await resources.findResourcesByNamePrefix(resPrefix)).filter((resource)=>{
+    const resArray = (
+      await resources.findResourcesByNamePrefix(resPrefix)
+    ).filter((resource) => {
       const endParts = resource.name
         .substring(resPrefix.length)
         .split('/')
@@ -248,15 +250,17 @@ export default async (bot: Bot) => {
         await ctx.deleteMessage();
       }
     } catch (_) {}
-    
-    await displayResourceFiles(
-      resArray[0],
-      ctx.callbackQuery.message!.chat.id,
-      ctx.callbackQuery.message!.is_topic_message
-        ? ctx.callbackQuery.message!.message_thread_id
-        : undefined,
-      ctx.callbackQuery.from!.id,
-    );
+
+    resArray.forEach(async (resource) => {
+      await displayResourceFiles(
+        resource,
+        ctx.callbackQuery.message!.chat.id,
+        ctx.callbackQuery.message!.is_topic_message
+          ? ctx.callbackQuery.message!.message_thread_id
+          : undefined,
+        ctx.callbackQuery.from!.id,
+      );
+    });
 
     return next();
   });
@@ -405,6 +409,10 @@ export default async (bot: Bot) => {
         );
       });
       menu.row();
+
+      if (files.length > 0) {
+        menu.text(`✳️📄 View all files`, `res-view-all:${pathChain.join(':')}`);
+      }
     }
     menu.row();
     if (pathChain.length > 0) {
