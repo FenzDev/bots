@@ -13,7 +13,7 @@ export type UserResHistory = {
 };
 
 const collection: Collection<UserResHistory> =
-  db.collection<UserResHistory>('userResHistory');
+  db.collection<UserResHistory>('user_res_history');
 
 async function addUserHistory(input: Omit<UserResHistory, 'insertedAt'>) {
   const result = await collection.updateOne(
@@ -41,6 +41,7 @@ async function addUserHistory(input: Omit<UserResHistory, 'insertedAt'>) {
       { sort: { insertedAt: 1 } },
     );
   }
+  return result.upsertedCount;
 }
 
 async function findUserHistoryById(telegramId: number) {

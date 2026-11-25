@@ -269,7 +269,7 @@ export default async (bot: Bot) => {
 
     await userResHistory.addUserHistory({
       telegramId: ctx.callbackQuery.from!.id,
-      path: resPrefix,
+      path: resPrefix.split('/').slice(1, -1).join('/'),
     });
 
     return next();
@@ -327,7 +327,7 @@ export default async (bot: Bot) => {
 
     await userResHistory.addUserHistory({
       telegramId: ctx.callbackQuery.from!.id,
-      path: resource.name.split('/').slice(1).join('/'),
+      path: resource.name.split('/').slice(1, -1).join('/'),
     });
 
     return next();
@@ -345,13 +345,14 @@ export default async (bot: Bot) => {
         chatId,
         receiver_user_id,
         msgId,
-        title, {
+        title,
+        {
           reply_markup: menu,
         },
       );
     } else {
       const { menu, title } = await getMenu(chatId, pathChain);
-      await bot.api.editMessageText(chatId, msgId, title,{
+      await bot.api.editMessageText(chatId, msgId, title, {
         reply_markup: menu,
       });
     }
@@ -429,7 +430,7 @@ export default async (bot: Bot) => {
       menu.row();
 
       if (files.length > 0) {
-        menu.text(`✳️📄 View all files`, `res-view-all:${pathChain.join(':')}`);
+        menu.text(`🗃️ View all files`, `res-view-all:${pathChain.join(':')}`);
       }
     }
     menu.row();
@@ -444,8 +445,8 @@ export default async (bot: Bot) => {
       history.forEach((historyItem) => {
         logger.error(historyItem, 'history item');
 
-        const resFolder = historyItem.path.split('/').slice(0, -1);
-        menu.text(`🕘 ${resFolder.join('»')}`, `${resFolder.join(':')}`);
+        const resFolder = historyItem.path.split('/');
+        menu.text(`🕘 ${resFolder.join('»')}`, `res:${resFolder.join(':')}`);
         menu.row();
       });
     }
