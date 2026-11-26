@@ -429,7 +429,7 @@ export default async (bot: Bot) => {
       });
       menu.row();
 
-      if (files.length > 0) {
+      if (files.length > 1) {
         menu.text(`🗃️ View all files`, `res-view-all:${pathChain.join(':')}`);
       }
     }
