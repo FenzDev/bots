@@ -269,7 +269,7 @@ export default async (bot: Bot) => {
 
     await userResHistory.addUserHistory({
       telegramId: ctx.callbackQuery.from!.id,
-      path: resPrefix.split('/').slice(1, -1).join('/'),
+      path: resPrefix.split('/').slice(1).join('/'),
     });
 
     return next();
