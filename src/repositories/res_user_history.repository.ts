@@ -24,8 +24,6 @@ async function addUserHistory(input: Omit<UserResHistory, 'insertedAt'>) {
     {
       $set: {
         displayName: input.displayName,
-      },
-      $setOnInsert: {
         insertedAt: new Date(),
       },
     },
