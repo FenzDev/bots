@@ -380,7 +380,7 @@ export default async (bot: Bot) => {
       modules.forEach((module, idx) => {
         if (idx % 2 == 0) menu.row();
         menu.text(
-          module.displayShort ?? module.name.toUpperCase(),
+          `${module.icon ?? ''} ${module.displayShort ?? module.name.toUpperCase()}`,
           `res:${pathChain[0]}:${module.name}`,
         );
       });

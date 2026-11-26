@@ -1,7 +1,6 @@
-import z from "zod";
-import { db } from "../lib/mongodb.js";
-import Module from "node:module";
-import { WithId } from "mongodb";
+import z from 'zod';
+import { db } from '../lib/mongodb.js';
+import { WithId } from 'mongodb';
 
 export const resourcesModuleInputSchema = z
   .object({
@@ -11,12 +10,14 @@ export const resourcesModuleInputSchema = z
     displayShort: z.string().optional(),
     displayLong: z.string().optional(),
 
+    icon: z.string().optional(),
+
     reviewerId: z.coerce.number().optional(),
 
     resourcesInputChatId: z.coerce.number().int().optional(),
 
     resourcesInputThreadId: z
-      .union([z.literal("null").transform(() => null), z.coerce.number().int()])
+      .union([z.literal('null').transform(() => null), z.coerce.number().int()])
       .optional(),
   })
   .strict();
@@ -27,7 +28,7 @@ export type ResourcesModule = ResourcesModuleInput & {
   insertedAt: Date;
 };
 
-const collection = db.collection<ResourcesModule>("modules");
+const collection = db.collection<ResourcesModule>('modules');
 
 async function findModuleFromName(name: string) {
   return collection.findOne({
@@ -79,7 +80,7 @@ async function findModulesFromSemester(
 }
 
 async function getExistingSemesters(): Promise<string[]> {
-  return (await collection.distinct("semester")).sort();
+  return (await collection.distinct('semester')).sort();
 }
 
 export const resourcesModules = {
