@@ -281,6 +281,7 @@ async function processAdminPhotoGroup(
     isMediaGroup: true,
   });
 
+  let i=0;
   for (const msg of messages) {
     if (!msg.photo) {
       continue;
@@ -291,7 +292,7 @@ async function processAdminPhotoGroup(
     await resourceFiles.addResourceFile({
       resourceId: resource._id,
       fileId: largestPhoto.file_id,
-      fileName: `photo_${generateTimestampId()}.jpg`,
+      fileName: `photo_${++i}_${generateTimestampId()}.jpg`,
       mimeType: "image/jpeg",
       telegramStoredMessageId: msg.message_id,
       mediaGroupId: msg.media_group_id,
